@@ -1,0 +1,150 @@
+---
+title: "OMNI meta-analysis summary"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Hard-coded things, packages
+
+
+```{r packages-sheets}
+suppressPackageStartupMessages({
+    #library(shiny)
+    library(googlesheets4)
+    library(dplyr)
+    library(readr)
+    library(DT)
+    library(ggplot2)
+    library(tidyr)
+    library(ggrepel)
+})
+
+options(gargle_oauth_email = TRUE)
+stub <- "https://docs.google.com/spreadsheets/d/"
+input_sheet <- paste0(stub, "1JzFnpFrhM8P-WF2pct6uu1AsJMUBI_tubgbkdyS5aV8")
+signup_sheet <- paste0(stub, "1h8hLUWiF9hw_JDKo2OaYSsuk4SvsyrdtL0JDKczZJFo")
+review_sheet <- paste0(stub, "1ljxV2bXVSq7ypwFndAnYOFO06akMBA0_8br-wMnYxR8")
+```
+
+
+## Papers
+
+
+```{r papers}
+suppressMessages({
+benchmarks <- googlesheets4::read_sheet(input_sheet) %>%
+  tidyr::replace_na(list(`simulator(s)`="–"))
+})
+```
+
+
+## The signups
+
+```{r signups}
+suppressMessages({
+signup <- googlesheets4::read_sheet(signup_sheet) %>%
+  dplyr::filter(doi != "dummy") %>% 
+  left_join(benchmarks %>% 
+              select(doi, title), by = "doi")
+})
+reviewers <- signup %>% group_by(reviewer) %>% tally
+
+#DT::datatable(reviewers)
+
+ggplot(reviewers, aes(x=reviewer, y=n)) + geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  ggtitle(paste0(nrow(signup), " signups from ", nrow(reviewers), " reviewers"))
+```
+
+## The reviews
+
+
+```{r reviews}
+suppressMessages({
+reviews <- googlesheets4::read_sheet(review_sheet) %>% 
+  rename(reviewer = `GitHub username of reviewer`)
+})
+
+#DT::datatable(reviews %>% select(-reviewer))
+
+signup <- signup %>% 
+  left_join(reviews %>% select(title, reviewer, Timestamp),
+            by = c("reviewer", "title"))
+reviewers <- signup %>% group_by(reviewer) %>% tally
+
+reviewers_committed <- reviews %>% group_by(reviewer) %>% 
+  tally %>% rename(committed = n)
+
+review_count <- reviews %>% group_by(title) %>% tally
+review_count <- benchmarks %>% select(doi, title, `evaluation-task`) %>% 
+  left_join(review_count, by = "title") %>% replace_na(list(n=0)) %>%
+  arrange(desc(n))
+
+DT::datatable(review_count %>% dplyr::arrange(n,`evaluation-task`))
+
+# ggplot(review_count, aes(n)) +
+#   geom_histogram()
+
+table(review_count$n)
+
+reviewers <- reviewers %>% 
+  left_join(reviewers_committed, by = "reviewer") %>%
+  replace_na(list(committed=0))
+#DT::datatable(reviewers)
+
+ggplot(reviewers, aes(n,committed, label=reviewer)) +
+  geom_point() +
+  geom_abline() +
+  geom_label_repel() + 
+  ggtitle(paste0(nrow(reviews), " total reviews (from ", 
+                 nrow(signup), " signups)")) +
+  xlab("signed-up") + ylab("reviewed")
+```
+
+
+## Missing reviews
+
+```{r missing-reviews}
+DT::datatable(signup %>% filter(is.na(Timestamp)) %>% select(-Timestamp))
+```
+
+<!-- ## Simulators -->
+
+
+<!-- ```{r simulators} -->
+<!-- suppressMessages({ -->
+<!-- benchmarks <- googlesheets4::read_sheet(input_sheet) %>% -->
+<!--   tidyr::replace_na(list(`simulator(s)`="–")) -->
+<!-- }) -->
+
+<!-- sims <- benchmarks$`simulator(s)` -->
+<!-- sims <- lapply(sims, strsplit, ", ") %>% unlist %>%  -->
+<!--   table %>% sort(decreasing = TRUE) -->
+
+<!-- ggplot(data.frame(simulator=names(sims), n=as.integer(sims)) %>%  -->
+<!--          dplyr::filter(!(simulator == "–")), -->
+<!--        aes(x=simulator, y=n)) + geom_bar(stat="identity") + -->
+<!--   theme(axis.text.x = element_text(angle = 45, hjust=1)) + -->
+<!--   ggtitle(paste0(nrow(benchmarks), " benchmarks; ", -->
+<!--                  sum(benchmarks$`simulator(s)`=="–"), " using simulation")) -->
+<!-- ``` -->
+
+
+
+## Sessioninfo
+```{r sessioninfo}
+sessionInfo()
+#devtools::session_info()
+```
+
+

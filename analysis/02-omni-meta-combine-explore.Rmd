@@ -1,0 +1,239 @@
+---
+title: "Consistency Report - Omni-benchmark"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Hard-coded things, packages
+
+
+```{r packages-sheets}
+suppressPackageStartupMessages({
+    #library(shiny)
+    library(googlesheets4)
+    library(dplyr)
+    library(readr)
+    library(DT)
+    library(ggplot2)
+    library(tidyr)
+    library(ggrepel)
+})
+
+options(gargle_oauth_email = TRUE)
+stub <- "https://docs.google.com/spreadsheets/d/"
+answers_sheet <- paste0(stub, "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
+```
+
+
+## Answers
+
+
+```{r papers, fig.width=14, fig.height=10}
+
+library(ggrepel)
+
+suppressMessages({
+answers <- googlesheets4::read_sheet(answers_sheet) %>%
+  tidyr::replace_na(list(`simulator(s)`="–"))
+})
+
+answers_g <- answers %>% group_by(title) 
+
+keep <- answers_g %>% tally() %>% filter(n>=2) %>% pull(title)
+answers_g <- answers_g %>% filter(title %in% keep)
+
+
+wrap_text <- function(string, n) {
+  require(stringr)
+  spaces <- str_locate_all(string, " ")[[1]][,1]
+  chars  <- nchar(string)
+  for(i in 1:floor(chars/n)) {
+    s <- spaces[which.min(abs(spaces - n*i))]
+    substring(string, s, s) <- "\n "
+  }
+  return(string)
+}
+
+summarize_cat <- function(u) {
+  s <- sort(c(u[["first"]], u[["second"]]))
+  paste0(s[1], " <---> ", s[2])
+}
+
+
+retrieve_pairs <- function(x, 
+                           colname = "Number of methods evaluated", 
+                           do_plot = TRUE, 
+                           add_repel = TRUE,
+                           convert_int = TRUE, 
+                           replace = 0, 
+                           do_categorical = FALSE) {
+  tb <- x %>% summarize(first = .data[[colname]][1],
+                        second = .data[[colname]][2])
+  if (convert_int) {
+    tb <- suppressWarnings(tb %>% mutate(first = as.integer(first),
+                                         second = as.integer(second)))
+  }
+  tb <- tb %>% mutate(first = replace_na(first, replace),
+                      second = replace_na(second, replace))
+  if(do_plot) {
+    p <- tb %>% ggplot(aes(first, second)) + geom_point() + ggtitle(colname)
+    
+      if (add_repel) {
+        p <- p + geom_label_repel(data = tb %>% filter(first != second),
+                                 aes(first, second, label=sapply(title, wrap_text, 30)), 
+                                 min.segment.length = unit(0, 'lines'),
+                                 size=4, nudge_x = .5, nudge_y = .5,
+                                 alpha = 0.7)
+      }
+    return(p)
+  }
+  
+  if(do_categorical) {
+    return(sort(table(apply(tb, 1, summarize_cat)), decreasing = TRUE))
+  }
+  return(tb)
+}
+
+retrieve_pairs(answers_g, "Number of methods evaluated", 
+               do_plot=TRUE, add_repel = TRUE, replace = -1)
+
+retrieve_pairs(answers_g, "Number of datasets used in evaluations", 
+               do_plot=TRUE, add_repel = TRUE, replace = 0.1) + 
+  scale_x_log10() + scale_y_log10()
+
+retrieve_pairs(answers_g, "Number of criteria used for assessment",
+               do_plot=TRUE, add_repel = TRUE)
+retrieve_pairs(answers_g, "Number of criteria used for assessment",
+               do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE, replace = -1)
+
+
+
+
+retrieve_pairs(answers_g, 
+               "For the methods benchmarked, what is/are the primary language/s they are written in?", 
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Type of workflow system used",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Degree to which authors are neutral",
+               do_plot = TRUE, convert_int = TRUE)
+retrieve_pairs(answers_g, 
+               "Degree to which authors are neutral",
+               do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Degree to which code to re-run benchmark is extensible (i.e., degree to which it is easy to add new methods / datasets / metrics.)",
+do_plot = TRUE, convert_int = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Degree to which code to re-run benchmark is extensible (i.e., degree to which it is easy to add new methods / datasets / metrics.)",
+               do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE)
+
+
+
+retrieve_pairs(answers_g, 
+               "Degree to which code is available",
+               do_plot = TRUE, convert_int = TRUE)
+retrieve_pairs(answers_g, 
+               "Degree to which code is available",
+               do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether input data used by the methods is available",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether a preprint was posted before publication",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether synthetic data is available",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether results (methods run on data) are available",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether performance results (results compared to ground truth) are available",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether performance results are explorable (e.g., web app, data package)",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether performance results are explorable (e.g., web app, data package)",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether software versions (of all software) are tracked",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether methods are run / made available within containers",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "Type of benchmark",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+retrieve_pairs(answers_g, 
+               "What secondary measures were assessed?",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE, replace=-1)
+
+
+
+
+retrieve_pairs(answers_g, 
+               "Whether parameter space of methods was explored beyond defaults",
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+
+
+#                > colnames(answers_g)
+#  [4] "Number of methods evaluated"      
+#  [5] "Number of datasets used in evaluations" 
+#  [6] "For the methods benchmarked, what is/are the primary language/s they are written in?" 
+#  [8] "Whether a preprint was posted before publication"              
+#  [9] "Type of benchmark"                                                                                                
+# [10] "Degree to which authors are neutral" 
+# [11] "General info notes"                 
+# [12] "Degree to which code is available"  
+# [13] "Whether input data used by the methods is available"
+# [14] "Whether synthetic data is available"                
+# [15] "Whether results (methods run on data) are available"
+# [16] "Whether performance results (results compared to ground truth) are available"
+# [17] "Whether performance results are explorable (e.g., web app, data package)"
+# [18] "Licence used for benchmark code"
+# [19] "Repository links"
+# [20] "Availability Notes"
+# [21] "Degree to which code to re-run benchmark is extensible (i.e., degree to which it is easy to add new methods / datasets / metrics.)"
+# [22] "Whether methods are run / made available within containers" 
+# [23] "Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?"             
+# [24] "Whether parameter space of methods was explored beyond defaults"
+# [25] "Whether software versions (of all software) are tracked"
+# [26] "Details notes"
+# [27] "Number of criteria used for assessment"          
+# [28] "What secondary measures were assessed?"                
+```
+
+
+## Sessioninfo
+```{r sessioninfo}
+sessionInfo()
+#devtools::session_info()
+```
+
