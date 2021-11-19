@@ -14,6 +14,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r packages-sheets}
+
+# build self-contained HTML
+#rmarkdown::render("analysis/02-omni-meta-combine-explore.Rmd", rmarkdown::html_document())
+
 suppressPackageStartupMessages({
     #library(shiny)
     library(googlesheets4)

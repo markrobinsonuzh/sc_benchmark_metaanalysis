@@ -18,6 +18,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r packages-sheets}
+
+# build self-contained HTML
+#rmarkdown::render("analysis/01-omni-meta-report.Rmd", rmarkdown::html_document())
+
+
 suppressPackageStartupMessages({
     #library(shiny)
     library(googlesheets4)
@@ -82,20 +87,27 @@ signup <- signup %>%
             by = c("reviewer", "title"))
 reviewers <- signup %>% group_by(reviewer) %>% tally
 
+signup_count <- signup %>% group_by(doi) %>% tally %>%
+  rename(n_signup = n)
+
 reviewers_committed <- reviews %>% group_by(reviewer) %>% 
   tally %>% rename(committed = n)
 
-review_count <- reviews %>% group_by(title) %>% tally
-review_count <- benchmarks %>% select(doi, title, `evaluation-task`) %>% 
-  left_join(review_count, by = "title") %>% replace_na(list(n=0)) %>%
-  arrange(desc(n))
+review_count <- reviews %>% group_by(title) %>% tally %>% 
+  rename(n_review = n)
 
-DT::datatable(review_count %>% dplyr::arrange(n,`evaluation-task`))
+review_count <- benchmarks %>% select(doi, title, `evaluation-task`) %>% 
+  left_join(review_count, by = "title") %>% replace_na(list(n_review=0)) %>%
+  left_join(signup_count, by = "doi") %>% replace_na(list(n_signup=0)) %>%
+  arrange(desc(n_review), desc(n_signup))
+
+DT::datatable(review_count %>% 
+                dplyr::arrange(n_review, n_signup,`evaluation-task`))
 
 # ggplot(review_count, aes(n)) +
 #   geom_histogram()
 
-table(review_count$n)
+table(review_count$n_review)
 
 reviewers <- reviewers %>% 
   left_join(reviewers_committed, by = "reviewer") %>%
