@@ -31,7 +31,11 @@ suppressPackageStartupMessages({
 
 options(gargle_oauth_email = TRUE)
 stub <- "https://docs.google.com/spreadsheets/d/"
-answers_sheet <- paste0(stub, "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
+# answers_sheet <- paste0(stub, 
+#                         "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
+answers_sheet <- paste0(stub, 
+                        "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
+
 ```
 
 
@@ -46,6 +50,18 @@ suppressMessages({
 answers <- googlesheets4::read_sheet(answers_sheet) %>%
   tidyr::replace_na(list(`simulator(s)`="–"))
 })
+
+w <- grep("Degree to which code to re-run benchmark is extensible",
+     colnames(answers))
+colnames(answers)[w] <- "Degree to which code to re-run benchmark is extensible"
+
+w <- grep("Whether performance results are explorable",
+     colnames(answers))
+colnames(answers)[w] <- "Whether performance results are explorable"
+
+w <- grep("Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?",
+          colnames(answers), fixed = TRUE)
+colnames(answers)[w] <- "Whether any provenance is used"
 
 answers_g <- answers %>% group_by(title) 
 
@@ -100,9 +116,24 @@ retrieve_pairs <- function(x,
   
   if(do_categorical) {
     return(sort(table(apply(tb, 1, summarize_cat)), decreasing = TRUE))
-  }
+  } 
   return(tb)
 }
+
+
+find_concordance <- function(x) x %>% mutate(same = (first==second)+0) %>% pull(same) %>% mean()
+
+
+cn <- colnames(answers_g)
+remove <- c("Details notes","Timestamp",
+            "GitHub username of reviewer",
+            "title","General info notes",
+            "Repository links","Availability Notes",
+            "Details notes")
+cn <- setdiff(cn, remove)
+
+lapply(cn, )
+
 
 retrieve_pairs(answers_g, "Number of methods evaluated", 
                do_plot=TRUE, add_repel = TRUE, replace = -1)
@@ -116,12 +147,23 @@ retrieve_pairs(answers_g, "Number of criteria used for assessment",
 retrieve_pairs(answers_g, "Number of criteria used for assessment",
                do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE, replace = -1)
 
+rp <- retrieve_pairs(answers_g, "Number of criteria used for assessment",
+               do_plot = FALSE, convert_int = TRUE, do_categorical = FALSE, replace = -1)
+rp %>% mutate(same = (first==second)+0) %>% pull(same) %>% mean()
 
+
+rp <- retrieve_pairs(answers_g, "Degree to which code to re-run benchmark is extensible",
+               do_plot = FALSE, convert_int = TRUE, do_categorical = FALSE, replace = -1)
+rp %>% mutate(same = (first==second)+0) %>% pull(same) %>% mean()
 
 
 retrieve_pairs(answers_g, 
                "For the methods benchmarked, what is/are the primary language/s they are written in?", 
                do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+rp <- retrieve_pairs(answers_g, "For the methods benchmarked, what is/are the primary language/s they are written in?",
+               do_plot = FALSE, convert_int = TRUE, do_categorical = FALSE, replace = -1)
+rp %>% mutate(same = (first==second)+0) %>% pull(same) %>% mean()
+
 
 retrieve_pairs(answers_g, 
                "Type of workflow system used",

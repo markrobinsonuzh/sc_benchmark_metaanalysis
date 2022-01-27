@@ -1,0 +1,167 @@
+---
+title: "Histogram summaries - Omni-benchmark"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Hard-coded things, packages
+
+
+```{r packages-sheets}
+
+# build self-contained HTML
+#rmarkdown::render("analysis/03-omni-meta-barplot-summaries.Rmd", rmarkdown::html_document())
+
+suppressPackageStartupMessages({
+    #library(shiny)
+    library(googlesheets4)
+    library(dplyr)
+    library(readr)
+    library(DT)
+    library(ggplot2)
+    library(tidyr)
+    library(ggrepel)
+    library(cowplot)
+})
+
+options(gargle_oauth_email = TRUE)
+stub <- "https://docs.google.com/spreadsheets/d/"
+# answers_sheet <- paste0(stub, "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
+answers_sheet <- paste0(stub, "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
+
+
+
+
+```
+
+
+## Answers
+
+
+```{r papers, fig.width=8, fig.height=6}
+
+suppressMessages({
+answers <- googlesheets4::read_sheet(answers_sheet) %>%
+  tidyr::replace_na(list(`simulator(s)`="–"))
+})
+
+# answers_g <- answers %>% group_by(title) 
+
+
+plot_summary_cat <- function(tab, 
+                         column="Whether a preprint was posted before publication", 
+                         min=1,
+                         order_it=TRUE) {
+  n <- tab %>% group_by(!!as.name(column)) %>% tally() %>% arrange(desc(n))
+  tab <- tab %>% left_join(n) %>% dplyr::filter(n > min)
+  n <- n %>% dplyr::filter(n > min) %>% 
+    mutate(f = !!as.name(column))
+  if (order_it)
+    n <- n %>% mutate(f = factor(f, levels = f))
+  if(nrow(n)==2)
+    colouring <- scale_fill_manual(values = c("No"="#ffffcc", "Yes"="#006837"))
+  else {
+    colouring <- scale_fill_manual(values = c("5"="#ffffcc","4"="#c2e699","3"="#78c679",
+                                                "2"="#31a354","1"="#006837"))
+  }
+  ggplot(n %>% dplyr::filter(!is.na(f)), 
+         aes(x=f, y=n/sum(n)*100, fill=f)) + 
+    geom_bar(stat="identity", show.legend = FALSE) +
+    colouring +
+    xlab("") + ylab("Percentage") +
+    ggtitle(column) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=24),
+          text = element_text(size=24)) 
+}
+
+
+w <- grep("Degree to which code to re-run benchmark is extensible",
+     colnames(answers))
+colnames(answers)[w] <- "How easy is it to extend the benchmark?"
+
+w <- grep("Whether performance results are explorable",
+     colnames(answers))
+colnames(answers)[w] <- "Are results explorable?"
+
+
+
+answers$`How easy is it to extend the benchmark?` <- factor(answers$`How easy is it to extend the benchmark?`)
+# levels()
+
+
+# plot_summary_cat(answers, 
+#                  "Type of workflow system used")
+# 
+# a <- plot_summary_cat(answers, 
+#                  "Whether input data used by the methods is available",
+#                  order_it = FALSE)
+# 
+# b <- plot_summary_cat(answers, 
+#                  "Whether performance results are explorable", 
+#                  order_it = FALSE)
+# 
+# plot_grid(a, b)
+
+# plot_summary_cat(answers, 
+#                  "Whether software versions (of all software) are tracked",
+#                  order_it = FALSE)
+
+p <- plot_summary_cat(answers, 
+                 "Are results explorable?", order_it = FALSE)
+p
+
+
+q <- plot_summary_cat(answers, 
+                 "How easy is it to extend the benchmark?", 
+                 order_it = FALSE)
+
+
+plot_grid(q + scale_x_discrete(labels = c("Easy","","","","Hard")),
+          p,
+          align = "h", axis = "b", 
+          rel_widths = 1-c(.33,.66))
+
+
+
+
+w#                > colnames(answers_g)
+#  [4] "Number of methods evaluated"      
+#  [5] "Number of datasets used in evaluations" 
+#  [6] "For the methods benchmarked, what is/are the primary language/s they are written in?" 
+#  [7] "Type of workflow system used"
+#  [8] "Whether a preprint was posted before publication"              
+#  [9] "Type of benchmark"                                                                                                
+# [10] "Degree to which authors are neutral" 
+# [11] "General info notes"                 
+# [12] "Degree to which code is available"  
+# [13] "Whether input data used by the methods is available"
+# [14] "Whether synthetic data is available"                
+# [15] "Whether results (methods run on data) are available"
+# [16] "Whether performance results (results compared to ground truth) are available"
+# [17] "Whether performance results are explorable (e.g., web app, data package)"
+# [18] "Licence used for benchmark code"
+# [19] "Repository links"
+# [20] "Availability Notes"
+# [21] "Degree to which code to re-run benchmark is extensible (i.e., degree to which it is easy to add new methods / datasets / metrics.)"
+# [22] "Whether methods are run / made available within containers" 
+# [23] "Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?"             
+# [24] "Whether parameter space of methods was explored beyond defaults"
+# [25] "Whether software versions (of all software) are tracked"
+# [26] "Details notes"
+# [27] "Number of criteria used for assessment"          
+# [28] "What secondary measures were assessed?"                
+```
+
+
+## Sessioninfo
+```{r sessioninfo}
+sessionInfo()
+#devtools::session_info()
+```
+
