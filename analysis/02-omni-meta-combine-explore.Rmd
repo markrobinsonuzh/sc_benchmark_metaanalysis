@@ -5,7 +5,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Hard-coded things, packages
 
 
-```{r packages-sheets}
+```{r packages-sheets, message=FALSE, warning=FALSE}
 
 # build self-contained HTML
 #rmarkdown::render("analysis/02-omni-meta-combine-explore.Rmd", rmarkdown::html_document())
@@ -33,40 +33,19 @@ options(gargle_oauth_email = TRUE)
 stub <- "https://docs.google.com/spreadsheets/d/"
 # answers_sheet <- paste0(stub, 
 #                         "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
+# answers_sheet <- paste0(stub, 
+#                         "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
 answers_sheet <- paste0(stub, 
-                        "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
+                        "1ZMdGOv_ifRv9AWY-pIrXdzI4j9upeEvCI2aeRdLe94E")
+
+
 
 ```
 
 
-## Answers
+## Functions
 
-
-```{r papers, fig.width=14, fig.height=10}
-
-library(ggrepel)
-
-suppressMessages({
-answers <- googlesheets4::read_sheet(answers_sheet) %>%
-  tidyr::replace_na(list(`simulator(s)`="–"))
-})
-
-w <- grep("Degree to which code to re-run benchmark is extensible",
-     colnames(answers))
-colnames(answers)[w] <- "Degree to which code to re-run benchmark is extensible"
-
-w <- grep("Whether performance results are explorable",
-     colnames(answers))
-colnames(answers)[w] <- "Whether performance results are explorable"
-
-w <- grep("Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?",
-          colnames(answers), fixed = TRUE)
-colnames(answers)[w] <- "Whether any provenance is used"
-
-answers_g <- answers %>% group_by(title) 
-
-keep <- answers_g %>% tally() %>% filter(n>=2) %>% pull(title)
-answers_g <- answers_g %>% filter(title %in% keep)
+```{r functions, message=FALSE, warning=FALSE}
 
 
 wrap_text <- function(string, n) {
@@ -92,7 +71,8 @@ retrieve_pairs <- function(x,
                            add_repel = TRUE,
                            convert_int = TRUE, 
                            replace = 0, 
-                           do_categorical = FALSE) {
+                           do_categorical = FALSE,
+                           add_jitter = FALSE) {
   tb <- x %>% summarize(first = .data[[colname]][1],
                         second = .data[[colname]][2])
   if (convert_int) {
@@ -102,7 +82,11 @@ retrieve_pairs <- function(x,
   tb <- tb %>% mutate(first = replace_na(first, replace),
                       second = replace_na(second, replace))
   if(do_plot) {
-    p <- tb %>% ggplot(aes(first, second)) + geom_point() + ggtitle(colname)
+    p <- tb %>% ggplot(aes(first, second)) + ggtitle(colname)
+    if(add_jitter)
+      p <- p + geom_jitter(width=.15, height=.15)
+    else
+      p <- p + geom_point() 
     
       if (add_repel) {
         p <- p + geom_label_repel(data = tb %>% filter(first != second),
@@ -120,136 +104,169 @@ retrieve_pairs <- function(x,
   return(tb)
 }
 
+faff <- function(u) {
+  u <- u[1]
+  if(is.null(u))
+    return(NA)
+  else
+    return(u)
+}
 
-find_concordance <- function(x) x %>% mutate(same = (first==second)+0) %>% pull(same) %>% mean()
 
+find_concordance <- function(col = "Number of criteria used for assessment") {
+  rp <- retrieve_pairs(answers_g, col,
+               do_plot = FALSE, convert_int = FALSE, do_categorical = FALSE, replace = NA)
+  if(class(rp$first)=="list") {
+    rp$first <- sapply(rp$first, faff)
+    rp$second <- sapply(rp$second, faff)
+  }
+  rp <- rp %>% dplyr::mutate(same = (first==second)+0)
+  rp$same[is.na(rp$first) | is.na(rp$second)] <- NA
+  m <- rp %>% pull(same) %>% mean(na.rm=TRUE)*100
+  nas <- rp %>% pull(same) %>% is.na %>% mean()*100
+  rp <- rp %>% mutate(first = as.numeric(first), second = as.numeric(second))
+  cr <- cor(rp$first, rp$second, use = "everything", method = "spearman")
+  data.frame(perc_concordant=m, correlation=cr, perc_NA=nas)
+}
+
+
+```
+
+## Answers
+
+
+```{r papers, fig.width=14, fig.height=10, message=FALSE, warning=FALSE}
+
+suppressMessages({
+answers <- googlesheets4::read_sheet(answers_sheet) %>%
+  tidyr::replace_na(list(`simulator(s)`="–"))
+})
+
+w <- grep("Degree to which code to re-run benchmark is extensible",
+     colnames(answers))
+colnames(answers)[w] <- "Degree to which code to re-run benchmark is extensible"
+
+w <- grep("Whether performance results are explorable",
+     colnames(answers))
+colnames(answers)[w] <- "Whether performance results are explorable"
+
+w <- grep("Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?",
+          colnames(answers), fixed = TRUE)
+colnames(answers)[w] <- "Whether any provenance is used"
+
+answers_g <- answers %>% group_by(title) 
+
+answers_g %>% tally() %>% filter(n==1)
+
+keep <- answers_g %>% tally() %>% filter(n>=2) %>% pull(title)
+answers_g <- answers_g %>% filter(title %in% keep)
+
+
+
+# find_concordance("Whether a preprint was posted before publication")
 
 cn <- colnames(answers_g)
 remove <- c("Details notes","Timestamp",
             "GitHub username of reviewer",
             "title","General info notes",
             "Repository links","Availability Notes",
+            "Licence used for benchmark code",
             "Details notes")
 cn <- setdiff(cn, remove)
+names(cn) <- cn
 
-lapply(cn, )
-
-
-retrieve_pairs(answers_g, "Number of methods evaluated", 
-               do_plot=TRUE, add_repel = TRUE, replace = -1)
-
-retrieve_pairs(answers_g, "Number of datasets used in evaluations", 
-               do_plot=TRUE, add_repel = TRUE, replace = 0.1) + 
-  scale_x_log10() + scale_y_log10()
-
-retrieve_pairs(answers_g, "Number of criteria used for assessment",
-               do_plot=TRUE, add_repel = TRUE)
-retrieve_pairs(answers_g, "Number of criteria used for assessment",
-               do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE, replace = -1)
-
-rp <- retrieve_pairs(answers_g, "Number of criteria used for assessment",
-               do_plot = FALSE, convert_int = TRUE, do_categorical = FALSE, replace = -1)
-rp %>% mutate(same = (first==second)+0) %>% pull(same) %>% mean()
-
-
-rp <- retrieve_pairs(answers_g, "Degree to which code to re-run benchmark is extensible",
-               do_plot = FALSE, convert_int = TRUE, do_categorical = FALSE, replace = -1)
-rp %>% mutate(same = (first==second)+0) %>% pull(same) %>% mean()
-
-
-retrieve_pairs(answers_g, 
-               "For the methods benchmarked, what is/are the primary language/s they are written in?", 
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-rp <- retrieve_pairs(answers_g, "For the methods benchmarked, what is/are the primary language/s they are written in?",
-               do_plot = FALSE, convert_int = TRUE, do_categorical = FALSE, replace = -1)
-rp %>% mutate(same = (first==second)+0) %>% pull(same) %>% mean()
-
-
-retrieve_pairs(answers_g, 
-               "Type of workflow system used",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Degree to which authors are neutral",
-               do_plot = TRUE, convert_int = TRUE)
-retrieve_pairs(answers_g, 
-               "Degree to which authors are neutral",
-               do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Degree to which code to re-run benchmark is extensible (i.e., degree to which it is easy to add new methods / datasets / metrics.)",
-do_plot = TRUE, convert_int = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Degree to which code to re-run benchmark is extensible (i.e., degree to which it is easy to add new methods / datasets / metrics.)",
-               do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE)
+z <- lapply(cn, find_concordance) %>% bind_rows(.id = "question")
+DT::datatable(z %>% arrange(desc(perc_concordant)))
 
 
 
-retrieve_pairs(answers_g, 
-               "Degree to which code is available",
-               do_plot = TRUE, convert_int = TRUE)
-retrieve_pairs(answers_g, 
-               "Degree to which code is available",
-               do_plot = FALSE, convert_int = TRUE, do_categorical = TRUE)
+```
 
-retrieve_pairs(answers_g, 
-               "Whether input data used by the methods is available",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+# Questions where a plot could be useful
 
-retrieve_pairs(answers_g, 
-               "Whether a preprint was posted before publication",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Whether synthetic data is available",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Whether results (methods run on data) are available",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Whether performance results (results compared to ground truth) are available",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Whether performance results are explorable (e.g., web app, data package)",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Whether performance results are explorable (e.g., web app, data package)",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Whether software versions (of all software) are tracked",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Whether methods are run / made available within containers",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "Type of benchmark",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
-
-retrieve_pairs(answers_g, 
-               "What secondary measures were assessed?",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE, replace=-1)
+```{r plotters, fig.width=14, fig.height=10, message=FALSE, warning=FALSE}
 
 
+plotters <- c("Degree to which authors are neutral",
+              "Number of methods evaluated",
+              "Degree to which code is available",
+              "Number of datasets used in evaluations",
+              "Degree to which code to re-run benchmark is extensible",
+              "Number of criteria used for assessment")
 
 
-retrieve_pairs(answers_g, 
-               "Whether parameter space of methods was explored beyond defaults",
-               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE)
+for(q in plotters) {
+  rp <- retrieve_pairs(answers_g, q,
+              do_plot = FALSE, convert_int = TRUE, do_categorical = FALSE,
+              replace = -99)
+  print( rp %>% filter(abs(first-second)>2 | (is.na(first) & is.na(second))) )
+  
+  p <- retrieve_pairs(answers_g, q,
+               do_plot = TRUE, add_jitter = TRUE, convert_int = TRUE,
+               add_repel = FALSE, replace = -1)
+  if(max(rp$first) > 200 | max(rp$second) > 200)
+    p <- p + scale_x_sqrt() + scale_y_sqrt()
+  show(p)
+  
+
+}
+
+```
+
+# Questions where a plot is probably not useful
 
 
-#                > colnames(answers_g)
+```{r non_plotters, fig.width=14, fig.height=10, message=FALSE, warning=FALSE}
+
+
+non_plotters <- c("Type of workflow system used",
+                  "Whether input data used by the methods is available",
+                  "Whether synthetic data is available",
+                  "Whether results (methods run on data) are available",
+                  "Whether performance results (results compared to ground truth) are available",
+                  "Whether performance results are explorable",
+                  "Whether software versions (of all software) are tracked",
+                  "Whether methods are run / made available within containers",
+                  "Whether a preprint was posted before publication",
+                  "Type of benchmark",
+                  "Whether parameter space of methods was explored beyond defaults",
+                  "Whether any provenance is used")
+                  
+
+for(q in non_plotters) {
+  retrieve_pairs(answers_g, q, do_plot = FALSE, 
+                 convert_int = FALSE, do_categorical = TRUE, 
+                 replace = -99)
+  rp <- retrieve_pairs(answers_g, q, do_plot = FALSE, 
+                       convert_int = FALSE, do_categorical = FALSE,
+                       replace = -99)
+  cat(paste0("\n\n", q, "\n-------\n"))
+  print(rp %>% filter(first != second))
+
+}
+
+
+```
+
+
+# Questions where we will take a union
+
+```{r unions, fig.width=14, fig.height=10, message=FALSE, warning=FALSE}
+
+unioners <- c("Licence used for benchmark code",
+              "For the methods benchmarked, what is/are the primary language/s they are written in?",
+              "What secondary measures were assessed?")
+
+for(q in unioners) {
+  retrieve_pairs(answers_g, q, 
+               do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE,
+               replace = -99)
+}
+
+```
+
+
+```{r dump}
 #  [4] "Number of methods evaluated"      
 #  [5] "Number of datasets used in evaluations" 
 #  [6] "For the methods benchmarked, what is/are the primary language/s they are written in?" 
@@ -278,7 +295,7 @@ retrieve_pairs(answers_g,
 
 
 ## Sessioninfo
-```{r sessioninfo}
+```{r sessioninfo, message=FALSE, warning=FALSE}
 sessionInfo()
 #devtools::session_info()
 ```
