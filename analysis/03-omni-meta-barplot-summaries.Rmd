@@ -33,7 +33,9 @@ suppressPackageStartupMessages({
 options(gargle_oauth_email = TRUE)
 stub <- "https://docs.google.com/spreadsheets/d/"
 # answers_sheet <- paste0(stub, "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
-answers_sheet <- paste0(stub, "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
+# answers_sheet <- paste0(stub, "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
+answers_sheet <- paste0(stub, "1ZMdGOv_ifRv9AWY-pIrXdzI4j9upeEvCI2aeRdLe94E")
+
 
 
 
@@ -77,7 +79,7 @@ plot_summary_cat <- function(tab,
     xlab("") + ylab("Percentage") +
     ggtitle(column) +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=24),
-          text = element_text(size=24)) 
+          text = element_text(size=18)) 
 }
 
 
@@ -114,12 +116,12 @@ answers$`How easy is it to extend the benchmark?` <- factor(answers$`How easy is
 
 p <- plot_summary_cat(answers, 
                  "Are results explorable?", order_it = FALSE)
-p
 
 
 q <- plot_summary_cat(answers, 
                  "How easy is it to extend the benchmark?", 
                  order_it = FALSE)
+q + scale_x_discrete(labels = c("Easy","","","","Hard"))
 
 
 plot_grid(q + scale_x_discrete(labels = c("Easy","","","","Hard")),
@@ -127,10 +129,79 @@ plot_grid(q + scale_x_discrete(labels = c("Easy","","","","Hard")),
           align = "h", axis = "b", 
           rel_widths = 1-c(.33,.66))
 
+q <- plot_summary_cat(answers, 
+                 "Type of workflow system used", 
+                 order_it = TRUE)
+q + scale_x_discrete()
 
 
 
-w#                > colnames(answers_g)
+q <- plot_summary_cat(answers, 
+                 "Whether a preprint was posted before publication", 
+                 order_it = TRUE)
+q + scale_x_discrete()
+
+
+
+q <- plot_summary_cat(answers, 
+                 "Whether a preprint was posted before publication", 
+                 order_it = TRUE)
+q + scale_x_discrete()
+
+
+
+q <- plot_summary_cat(answers, 
+                 "Whether synthetic data is available", 
+                 order_it = TRUE)
+q + scale_x_discrete()
+
+
+q <- plot_summary_cat(answers, 
+                 "Whether results (methods run on data) are available", 
+                 order_it = TRUE)
+q + scale_x_discrete()
+
+
+
+q <- plot_summary_cat(answers, 
+                 "Whether methods are run / made available within containers" , 
+                 order_it = TRUE)
+q + scale_x_discrete()
+
+
+
+
+q <- plot_summary_cat(answers, 
+                 "Whether software versions (of all software) are tracked", 
+                 order_it = TRUE)
+q + scale_x_discrete()
+
+
+
+q <- plot_summary_cat(answers, 
+                 "Whether parameter space of methods was explored beyond defaults", 
+                 order_it = TRUE)
+q + scale_x_discrete()
+
+
+
+q <- plot_summary_cat(answers, 
+                 "Whether performance results (results compared to ground truth) are available", 
+                 order_it = TRUE)
+q + scale_x_discrete()
+
+
+answers$`Degree to which authors are neutral` <- factor(answers$`Degree to which authors are neutral`)
+
+q <- plot_summary_cat(answers, 
+                 "Degree to which authors are neutral", 
+                 order_it = FALSE)
+q + scale_x_discrete(labels = c("Fully","","","","Not"))
+
+
+
+
+#                > colnames(answers_g)
 #  [4] "Number of methods evaluated"      
 #  [5] "Number of datasets used in evaluations" 
 #  [6] "For the methods benchmarked, what is/are the primary language/s they are written in?" 

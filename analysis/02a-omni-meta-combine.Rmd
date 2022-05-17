@@ -1,0 +1,172 @@
+---
+title: "Consistency Report - Omni-benchmark"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(width=100, dplyr.print_max = 50)
+```
+
+
+## Hard-coded things, packages
+
+
+```{r packages-sheets, message=FALSE, warning=FALSE}
+
+# build self-contained HTML
+#rmarkdown::render("analysis/02-omni-meta-combine-explore.Rmd", rmarkdown::html_document())
+
+suppressPackageStartupMessages({
+    #library(shiny)
+    library(googlesheets4)
+    library(dplyr)
+    library(readr)
+    library(DT)
+    library(ggplot2)
+    library(tidyr)
+    library(ggrepel)
+})
+
+options(gargle_oauth_email = TRUE)
+stub <- "https://docs.google.com/spreadsheets/d/"
+# answers_sheet <- paste0(stub, 
+#                         "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
+# answers_sheet <- paste0(stub, 
+#                         "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
+answers_sheet <- paste0(stub, 
+                        "1ZMdGOv_ifRv9AWY-pIrXdzI4j9upeEvCI2aeRdLe94E")
+
+
+
+```
+
+
+## Answers
+
+
+```{r papers, fig.width=14, fig.height=10, message=FALSE, warning=FALSE}
+
+suppressMessages({
+answers <- googlesheets4::read_sheet(answers_sheet) %>%
+  tidyr::replace_na(list(`simulator(s)`="–"))
+})
+
+w <- grep("Degree to which code to re-run benchmark is extensible",
+     colnames(answers))
+colnames(answers)[w] <- "Degree to which code to re-run benchmark is extensible"
+
+w <- grep("Whether performance results are explorable",
+     colnames(answers))
+colnames(answers)[w] <- "Whether performance results are explorable"
+
+w <- grep("Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?",
+          colnames(answers), fixed = TRUE)
+colnames(answers)[w] <- "Whether any provenance is used"
+
+answers_g <- answers %>% group_by(title) 
+dim(answers_g)
+
+answers_g %>% tally() %>% filter(n==1)
+
+answers_g %>% tally() %>% pull("n") %>% table
+
+keep <- answers_g %>% tally() %>% filter(n>=2) %>% pull(title)
+answers_g <- answers_g %>% filter(title %in% keep)
+dim(answers_g)
+
+
+# find_concordance("Whether a preprint was posted before publication")
+
+cn <- colnames(answers_g)
+remove <- c("Details notes","Timestamp",
+            "GitHub username of reviewer",
+            "title","General info notes",
+            "Repository links","Availability Notes",
+            "Licence used for benchmark code",
+            "Details notes")
+cn <- setdiff(cn, remove)
+names(cn) <- cn
+
+z <- lapply(cn, find_concordance) %>% bind_rows(.id = "question")
+DT::datatable(z %>% arrange(desc(perc_concordant)))
+
+
+numeric_cols <- c("Degree to which authors are neutral",
+                  "Number of methods evaluated",
+                  "Degree to which code is available",
+                  "Number of datasets used in evaluations",
+                  "Degree to which code to re-run benchmark is extensible",
+                  "Number of criteria used for assessment")
+
+categ_cols <- c("Type of workflow system used",
+                "Whether input data used by the methods is available",
+                "Whether synthetic data is available",
+                "Whether results (methods run on data) are available",
+                "Whether performance results (results compared to ground truth) are available",
+                "Whether performance results are explorable",
+                "Whether software versions (of all software) are tracked",
+                "Whether methods are run / made available within containers",
+                "Whether a preprint was posted before publication",
+                "Type of benchmark",
+                "Whether parameter space of methods was explored beyond defaults",
+                "Whether any provenance is used")
+
+union_cols <- c("Licence used for benchmark code",
+                "For the methods benchmarked, what is/are the primary language/s they are written in?",
+                "What secondary measures were assessed?")
+
+
+setdiff(cn, c(numeric_cols, categ_cols, union_cols))
+
+
+```
+
+# Aggregate multiple responses
+
+```{r plotters, fig.width=14, fig.height=10, message=FALSE, warning=FALSE}
+
+
+answers_num_agg <- answers_g %>% select("title", numeric_cols) %>% 
+  summarise_all(median)
+
+answers_cat_agg <- answers_g %>% select("title", categ_cols) %>% 
+  summarise_all(unique)
+
+# clunky but does it ..
+consolidate_unions <- function(u) {
+  u <- unique(na.omit(u))
+  if(length(u)==0)
+    return("")
+  if(length(u) == 1)
+    return(u)
+  else {
+    u <- strsplit(u, ", ", fixed = TRUE)
+    u <- unlist(u)
+    return(paste0(unique(u), collapse = ", "))
+  }
+}
+
+answers_union_list <- answers_g %>% select("title", union_cols) %>% 
+  split(answers_g$title)
+answers_union_agg <- lapply(answers_union_list,
+                            function(v) apply(v, 2, consolidate_unions)) %>%
+  bind_rows
+k <- answers_union_agg$`What secondary measures were assessed?`
+answers_union_agg$`What secondary measures were assessed?`[k==""] <- "None"
+
+
+# which(answers_union_agg == "", arr.ind = TRUE)
+
+
+```
+
+
+## Sessioninfo
+```{r sessioninfo, message=FALSE, warning=FALSE}
+sessionInfo()
+#devtools::session_info()
+```
+

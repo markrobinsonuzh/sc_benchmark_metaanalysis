@@ -7,6 +7,7 @@ editor_options:
 
 ```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(width=100, dplyr.print_max = 40)
 ```
 
 
@@ -27,6 +28,7 @@ suppressPackageStartupMessages({
     library(ggplot2)
     library(tidyr)
     library(ggrepel)
+    library(stringr)
 })
 
 options(gargle_oauth_email = TRUE)
@@ -199,7 +201,8 @@ for(q in plotters) {
   rp <- retrieve_pairs(answers_g, q,
               do_plot = FALSE, convert_int = TRUE, do_categorical = FALSE,
               replace = -99)
-  print( rp %>% filter(abs(first-second)>2 | (is.na(first) & is.na(second))) )
+  cat(paste0("\n\n", q, "\n-------\n"))
+  print( rp %>% filter(abs(first-second)>2 | first < -50 | second < -50) )
   
   p <- retrieve_pairs(answers_g, q,
                do_plot = TRUE, add_jitter = TRUE, convert_int = TRUE,
@@ -236,12 +239,14 @@ non_plotters <- c("Type of workflow system used",
 for(q in non_plotters) {
   retrieve_pairs(answers_g, q, do_plot = FALSE, 
                  convert_int = FALSE, do_categorical = TRUE, 
-                 replace = -99)
+                 replace = "empty")
   rp <- retrieve_pairs(answers_g, q, do_plot = FALSE, 
                        convert_int = FALSE, do_categorical = FALSE,
-                       replace = -99)
+                       replace = "empty")
   cat(paste0("\n\n", q, "\n-------\n"))
-  print(rp %>% filter(first != second))
+  print(rp %>% 
+          mutate(title=str_trunc(title, 40)) %>% 
+          filter(first != second) )
 
 }
 
@@ -258,9 +263,17 @@ unioners <- c("Licence used for benchmark code",
               "What secondary measures were assessed?")
 
 for(q in unioners) {
-  retrieve_pairs(answers_g, q, 
+  rp <- retrieve_pairs(answers_g, q, 
                do_plot = FALSE, convert_int = FALSE, do_categorical = TRUE,
-               replace = -99)
+               replace = "empty")
+  # print(rp)
+  rp <- retrieve_pairs(answers_g, q, do_plot = FALSE, 
+                       convert_int = FALSE, do_categorical = FALSE,
+                       replace = "empty")
+  cat(paste0("\n\n", q, "\n-------\n"))
+  print(rp %>% 
+          mutate(title=str_trunc(title, 40)) %>% 
+          filter(first != second) )
 }
 
 ```
