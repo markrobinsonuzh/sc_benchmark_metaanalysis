@@ -78,8 +78,6 @@ answers_g <- answers_g %>% filter(title %in% keep)
 dim(answers_g)
 
 
-# find_concordance("Whether a preprint was posted before publication")
-
 cn <- colnames(answers_g)
 remove <- c("Details notes","Timestamp",
             "GitHub username of reviewer",
@@ -89,9 +87,6 @@ remove <- c("Details notes","Timestamp",
             "Details notes")
 cn <- setdiff(cn, remove)
 names(cn) <- cn
-
-z <- lapply(cn, find_concordance) %>% bind_rows(.id = "question")
-DT::datatable(z %>% arrange(desc(perc_concordant)))
 
 
 numeric_cols <- c("Degree to which authors are neutral",
@@ -129,10 +124,10 @@ setdiff(cn, c(numeric_cols, categ_cols, union_cols))
 ```{r plotters, fig.width=14, fig.height=10, message=FALSE, warning=FALSE}
 
 
-answers_num_agg <- answers_g %>% select("title", numeric_cols) %>% 
+answers_num_agg <- answers_g %>% select("title", all_of(numeric_cols)) %>% 
   summarise_all(median)
 
-answers_cat_agg <- answers_g %>% select("title", categ_cols) %>% 
+answers_cat_agg <- answers_g %>% select("title", all_of(categ_cols)) %>% 
   summarise_all(unique)
 
 # clunky but does it ..
@@ -149,7 +144,7 @@ consolidate_unions <- function(u) {
   }
 }
 
-answers_union_list <- answers_g %>% select("title", union_cols) %>% 
+answers_union_list <- answers_g %>% select("title", all_of(union_cols)) %>% 
   split(answers_g$title)
 answers_union_agg <- lapply(answers_union_list,
                             function(v) apply(v, 2, consolidate_unions)) %>%
@@ -158,8 +153,22 @@ k <- answers_union_agg$`What secondary measures were assessed?`
 answers_union_agg$`What secondary measures were assessed?`[k==""] <- "None"
 
 
+answers_agg <- answers_num_agg %>% 
+  left_join(answers_cat_agg, by = "title") %>%
+  left_join(answers_union_agg, by = "title")
 # which(answers_union_agg == "", arr.ind = TRUE)
 
+
+table(answers_agg$`Type of workflow system used`)
+
+table(code_available = round(answers_agg$`Degree to which code is available`),
+      workflow_used = answers_agg$`Type of workflow system used`)
+
+
+saveRDS(answers_agg, file="answers_agg.rds")
+saveRDS(numeric_cols, file="numeric_cols.rds")
+saveRDS(categ_cols, file="categ_cols.rds")
+saveRDS(union_cols, file="union_cols.rds")
 
 ```
 

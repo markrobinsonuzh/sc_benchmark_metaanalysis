@@ -1,5 +1,5 @@
 ---
-title: "Histogram summaries - Omni-benchmark"
+title: "Various summaries - Benchmark meta-analysis"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -19,46 +19,30 @@ knitr::opts_chunk$set(echo = TRUE)
 #rmarkdown::render("analysis/03-omni-meta-barplot-summaries.Rmd", rmarkdown::html_document())
 
 suppressPackageStartupMessages({
-    #library(shiny)
-    library(googlesheets4)
     library(dplyr)
-    library(readr)
-    library(DT)
     library(ggplot2)
     library(tidyr)
     library(ggrepel)
     library(cowplot)
 })
 
-options(gargle_oauth_email = TRUE)
-stub <- "https://docs.google.com/spreadsheets/d/"
-# answers_sheet <- paste0(stub, "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
-# answers_sheet <- paste0(stub, "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
-answers_sheet <- paste0(stub, "1ZMdGOv_ifRv9AWY-pIrXdzI4j9upeEvCI2aeRdLe94E")
-
-
-
-
+answers_agg <- readRDS("output/answers_agg.rds")
+numeric_cols <- readRDS("output/numeric_cols.rds")
+categ_cols <- readRDS("output/categ_cols.rds")
+union_cols <- readRDS("output/union_cols.rds")
 
 ```
 
 
-## Answers
+## Define functions
 
 
 ```{r papers, fig.width=8, fig.height=6}
 
-suppressMessages({
-answers <- googlesheets4::read_sheet(answers_sheet) %>%
-  tidyr::replace_na(list(`simulator(s)`="–"))
-})
-
-# answers_g <- answers %>% group_by(title) 
-
 
 plot_summary_cat <- function(tab, 
                          column="Whether a preprint was posted before publication", 
-                         min=1,
+                         min=0,
                          order_it=TRUE) {
   n <- tab %>% group_by(!!as.name(column)) %>% tally() %>% arrange(desc(n))
   tab <- tab %>% left_join(n) %>% dplyr::filter(n > min)
@@ -68,7 +52,43 @@ plot_summary_cat <- function(tab,
     n <- n %>% mutate(f = factor(f, levels = f))
   if(nrow(n)==2)
     colouring <- scale_fill_manual(values = c("No"="#ffffcc", "Yes"="#006837"))
-  else {
+  else if(nrow(n)==3) {
+    colouring <- scale_fill_manual(values = c("No"="#ffffcc", "Yes"="#006837", 
+                                              "NA"="grey", "Not Applicable"="grey",
+                                              "Partially"="grey"))
+  } else {
+    colouring <- scale_fill_manual(values = c("5"="#ffffcc","4"="#c2e699","3"="#78c679",
+                                                "2"="#31a354","1"="#006837"))
+  }
+  ggplot(n %>% dplyr::filter(!is.na(f)), 
+         aes(x=f, y=n/sum(n)*100, fill=f)) + 
+    geom_bar(stat="identity", show.legend = FALSE) +
+    colouring +
+    xlab("") + ylab("Percentage") +
+    ggtitle(column) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=16),
+          text = element_text(size=12)) 
+}
+
+
+
+plot_summary_union <- function(tab, 
+                         column="Whether a preprint was posted before publication", 
+                         min=0,
+                         order_it=TRUE) {
+  n <- tab[[column]] %>% strsplit(", ", fixed = TRUE) %>% 
+    unlist %>% table %>% sort(decreasing = TRUE)
+  n <- data.frame(f = names(n), n = unclass(n)) %>%
+    dplyr::filter(n > min)
+  if (order_it)
+    n$f  <- factor(n$f, levels = n$f)
+  if(nrow(n)==2)
+    colouring <- scale_fill_manual(values = c("No"="#ffffcc", "Yes"="#006837"))
+  else if(nrow(n)==3) {
+    colouring <- scale_fill_manual(values = c("No"="#ffffcc", "Yes"="#006837", 
+                                              "NA"="grey", "Not Applicable"="grey",
+                                              "Partially"="grey"))
+  } else {
     colouring <- scale_fill_manual(values = c("5"="#ffffcc","4"="#c2e699","3"="#78c679",
                                                 "2"="#31a354","1"="#006837"))
   }
@@ -83,150 +103,100 @@ plot_summary_cat <- function(tab,
 }
 
 
-w <- grep("Degree to which code to re-run benchmark is extensible",
-     colnames(answers))
-colnames(answers)[w] <- "How easy is it to extend the benchmark?"
-
-w <- grep("Whether performance results are explorable",
-     colnames(answers))
-colnames(answers)[w] <- "Are results explorable?"
-
-
-
-answers$`How easy is it to extend the benchmark?` <- factor(answers$`How easy is it to extend the benchmark?`)
-# levels()
+plot_summary_continous_vs_cat <- function(tab, 
+                         cat_column="Whether a preprint was posted before publication", 
+                         contin_column="Degree to which authors are neutral") {
+  n <- tab %>% group_by(!!as.name(cat_column)) %>% tally() %>% arrange(desc(n))
+  tab[[cat_column]] <- factor(tab[[cat_column]], levels = n[[cat_column]])
+  ggplot(tab, aes(x=!!as.name(cat_column), y=!!as.name(contin_column))) + 
+    geom_violin() + geom_jitter(width=.1)
+}
 
 
-# plot_summary_cat(answers, 
-#                  "Type of workflow system used")
-# 
-# a <- plot_summary_cat(answers, 
-#                  "Whether input data used by the methods is available",
-#                  order_it = FALSE)
-# 
-# b <- plot_summary_cat(answers, 
-#                  "Whether performance results are explorable", 
-#                  order_it = FALSE)
-# 
-# plot_grid(a, b)
-
-# plot_summary_cat(answers, 
-#                  "Whether software versions (of all software) are tracked",
-#                  order_it = FALSE)
-
-p <- plot_summary_cat(answers, 
-                 "Are results explorable?", order_it = FALSE)
-
-
-q <- plot_summary_cat(answers, 
-                 "How easy is it to extend the benchmark?", 
-                 order_it = FALSE)
-q + scale_x_discrete(labels = c("Easy","","","","Hard"))
-
-
-plot_grid(q + scale_x_discrete(labels = c("Easy","","","","Hard")),
-          p,
-          align = "h", axis = "b", 
-          rel_widths = 1-c(.33,.66))
-
-q <- plot_summary_cat(answers, 
-                 "Type of workflow system used", 
-                 order_it = TRUE)
-q + scale_x_discrete()
+```
 
 
 
-q <- plot_summary_cat(answers, 
-                 "Whether a preprint was posted before publication", 
-                 order_it = TRUE)
-q + scale_x_discrete()
+## Continuous responses (bit manual)
+
+```{r}
+
+# switch all around such that higher is better (for opinion questions)
+w <- answers_agg$`Degree to which authors are neutral`
+answers_agg$`Degree to which authors are neutral` <- 6-w
+
+w <- answers_agg$`Degree to which code to re-run benchmark is extensible`
+answers_agg$`Degree to which code to re-run benchmark is extensible` <- 6-w
 
 
-
-q <- plot_summary_cat(answers, 
-                 "Whether a preprint was posted before publication", 
-                 order_it = TRUE)
-q + scale_x_discrete()
+# look at densities
 
 
+ggplot(answers_agg, aes(x = `Degree to which code to re-run benchmark is extensible`)) +
+  geom_density()
 
-q <- plot_summary_cat(answers, 
-                 "Whether synthetic data is available", 
-                 order_it = TRUE)
-q + scale_x_discrete()
+ggplot(answers_agg, aes(x = `Degree to which authors are neutral`)) +
+  geom_density()
 
-
-q <- plot_summary_cat(answers, 
-                 "Whether results (methods run on data) are available", 
-                 order_it = TRUE)
-q + scale_x_discrete()
+ggplot(answers_agg, aes(x = `Degree to which code is available`)) +
+  geom_density()
 
 
+ggplot(answers_agg, aes(x = `Degree to which code to re-run benchmark is extensible`,
+                        y = `Degree to which authors are neutral`,
+                        colour = `Degree to which code is available`)) +
+  geom_jitter(size=4, width = .1, height = .1) +
+  scale_colour_gradient2(low = "grey", mid = "blue", high = "red", midpoint = 3)
 
-q <- plot_summary_cat(answers, 
-                 "Whether methods are run / made available within containers" , 
-                 order_it = TRUE)
-q + scale_x_discrete()
+ggplot(answers_agg, aes(x = `Degree to which code to re-run benchmark is extensible`,
+                        colour = `Degree to which authors are neutral`,
+                        y = `Degree to which code is available`)) +
+  geom_jitter(size=4, width = .1, height = .1) +
+  scale_colour_gradient2(low = "grey", mid = "blue", high = "red", midpoint = 3)
 
+```
 
+## Categorical
 
-
-q <- plot_summary_cat(answers, 
-                 "Whether software versions (of all software) are tracked", 
-                 order_it = TRUE)
-q + scale_x_discrete()
-
-
-
-q <- plot_summary_cat(answers, 
-                 "Whether parameter space of methods was explored beyond defaults", 
-                 order_it = TRUE)
-q + scale_x_discrete()
-
-
-
-q <- plot_summary_cat(answers, 
-                 "Whether performance results (results compared to ground truth) are available", 
-                 order_it = TRUE)
-q + scale_x_discrete()
+```{r}
+categ_cols
+for(cats in categ_cols) {
+  q <- plot_summary_cat(answers_agg, cats, order_it = TRUE)
+  print(q + scale_x_discrete())
+}
 
 
-answers$`Degree to which authors are neutral` <- factor(answers$`Degree to which authors are neutral`)
+```
 
-q <- plot_summary_cat(answers, 
-                 "Degree to which authors are neutral", 
-                 order_it = FALSE)
-q + scale_x_discrete(labels = c("Fully","","","","Not"))
+
+## Union
+
+```{r}
+union_cols
+for(unions in union_cols) {
+  q <- plot_summary_union(answers_agg, unions, min = 0, order_it = TRUE)
+  print(q + scale_x_discrete())
+}
+
+
+```
+
+
+## Continuous by categorical
+
+```{r}
+for(cats in categ_cols) {
+  for(nums in numeric_cols) {
+    p <- plot_summary_continous_vs_cat(answers_agg, 
+                                       cat_column = cats, 
+                                       contin_column = nums)
+    print(p)
+  }
+}
 
 
 
 
-#                > colnames(answers_g)
-#  [4] "Number of methods evaluated"      
-#  [5] "Number of datasets used in evaluations" 
-#  [6] "For the methods benchmarked, what is/are the primary language/s they are written in?" 
-#  [7] "Type of workflow system used"
-#  [8] "Whether a preprint was posted before publication"              
-#  [9] "Type of benchmark"                                                                                                
-# [10] "Degree to which authors are neutral" 
-# [11] "General info notes"                 
-# [12] "Degree to which code is available"  
-# [13] "Whether input data used by the methods is available"
-# [14] "Whether synthetic data is available"                
-# [15] "Whether results (methods run on data) are available"
-# [16] "Whether performance results (results compared to ground truth) are available"
-# [17] "Whether performance results are explorable (e.g., web app, data package)"
-# [18] "Licence used for benchmark code"
-# [19] "Repository links"
-# [20] "Availability Notes"
-# [21] "Degree to which code to re-run benchmark is extensible (i.e., degree to which it is easy to add new methods / datasets / metrics.)"
-# [22] "Whether methods are run / made available within containers" 
-# [23] "Whether any provenance (e.g., tracking of running of methods on datasets, logging, common workflow language) is used?"             
-# [24] "Whether parameter space of methods was explored beyond defaults"
-# [25] "Whether software versions (of all software) are tracked"
-# [26] "Details notes"
-# [27] "Number of criteria used for assessment"          
-# [28] "What secondary measures were assessed?"                
 ```
 
 
