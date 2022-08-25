@@ -166,6 +166,11 @@ for(cats in categ_cols) {
 }
 
 
+q <- plot_summary_cat(answers_agg, 
+                      "Type of workflow system used", order_it = TRUE)
+q + scale_fill_manual(values = brewer.pal(6,"Set1"))
+
+
 ```
 
 
@@ -199,6 +204,60 @@ for(cats in categ_cols) {
 
 ```
 
+
+## Heatmap
+
+```{r}
+heatmap_cols <- setdiff(categ_cols,
+                        c("Type of workflow system used",
+                          "Type of benchmark"))
+
+m <- t(as.matrix(answers_agg[,heatmap_cols]))
+
+rn <- names(sort(rowSums(m == "Yes"), decreasing = TRUE))
+m <- m[rn,]
+
+rn <- rownames(m)
+rn <- gsub("^Whether ", "", rn)
+rn <- gsub("^any ", "", rn)
+rn <- gsub("is used", "used", rn, fixed = TRUE)
+rn <- gsub("are run / made available", "run", rn, fixed = TRUE)
+rn <- gsub("are available", "available", rn, fixed = TRUE)
+rn <- gsub("(results compared to", "(against", rn, fixed = TRUE)
+rn <- gsub("of methods was ", "", rn, fixed = TRUE)
+rn <- gsub("are explorable", "explorable", rn, fixed = TRUE)
+rn <- gsub("(of all software) are ", "", rn, fixed = TRUE)
+rn <- gsub("a preprint was posted before publication", "preprint posted", rn, fixed = TRUE)
+rn <- gsub("used by the methods is ", "", rn, fixed = TRUE)
+ 
+rownames(m) <- rn
+rownames(m)
+
+
+co <- colSums(m=="Yes") + colSums(m=="Partially")/2
+co <- order(co)
+
+
+m <- m[,co]
+
+
+library(ComplexHeatmap)
+
+
+pdf("heatmap.pdf", width=10, height=2)
+# png("heatmap.png", width=2000, height=400)
+Heatmap(m, col=c("cornflowerblue","lightyellow","orange","red"), 
+        row_gap = unit(4, "mm"),
+        cluster_columns = FALSE, cluster_rows = FALSE,
+        row_names_gp = gpar(fontsize = 8),
+        border = TRUE, rect_gp = gpar(col = "black"),
+        heatmap_legend_param = list(title = "Response"))
+dev.off()
+
+
+
+
+```
 
 ## Sessioninfo
 ```{r sessioninfo}

@@ -1,0 +1,782 @@
+---
+title: "Various summaries - Benchmark meta-analysis"
+author: Almut Lütge
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Summary plots meta analysis 
+
+Libraries
+```{r libs}
+
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(ggplot2)
+    library(tidyr)
+    library(ggrepel)
+    library(here)
+    library(cowplot)
+    library(grid)
+    library(ggdist)
+    library(wesanderson)
+    library(GGally)
+    library(magrittr)
+    library(RColorBrewer)
+    library(circlize)
+    library(pheatmap)
+    library(ComplexHeatmap)
+    library(forcats)
+})
+
+output_dir <- here("output")
+
+answers_agg <- readRDS(file.path(output_dir,"answers_agg.rds"))
+numeric_cols <- readRDS(file.path(output_dir, "numeric_cols.rds"))
+categ_cols <- readRDS(file.path(output_dir, "categ_cols.rds"))
+union_cols <- readRDS(file.path(output_dir, "union_cols.rds"))
+
+# switch all around such that higher is better (for opinion questions)
+w <- answers_agg$`Degree to which authors are neutral`
+answers_agg$`Degree to which authors are neutral` <- 6-w
+
+w <- answers_agg$`Degree to which code to re-run benchmark is extensible`
+answers_agg$`Degree to which code to re-run benchmark is extensible` <- 6-w
+
+bench_gs <- "https://docs.google.com/spreadsheets/d/1JzFnpFrhM8P-WF2pct6uu1AsJMUBI_tubgbkdyS5aV8/edit#gid=0"
+suppressMessages({
+answers <- googlesheets4::read_sheet(bench_gs) %>%
+  tidyr::replace_na(list(`simulator(s)`="–"))
+})
+
+answers_agg <- answers_agg %>% 
+  dplyr::left_join(answers %>% 
+                     dplyr::select("title", "evaluation-task", "simulator(s)"))
+
+```
+
+### Functions
+
+```{r}
+plot_summary_cat <- function(tab, 
+                         column, 
+                         min=0,
+                         order_it=TRUE) {
+  n <- answers_agg %>% group_by(!!as.name(column)) %>% tally() %>% arrange(desc(n))
+  tab <- tab %>% left_join(n) %>% dplyr::filter(n > min)
+  n <- n %>% dplyr::filter(n > min) %>% 
+    mutate(f = !!as.name(column))
+  if (order_it)
+    n <- n %>% mutate(f = factor(f, levels = f))
+  
+  ggplot(n %>% dplyr::filter(!is.na(f)), 
+         aes(x=f, y=n/sum(n)*100, fill=f)) + 
+    geom_bar(stat="identity", show.legend = FALSE) +
+    xlab("") + ylab("Percentage") +
+    ggtitle(column) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=12),
+          text = element_text(size=12)) 
+}
+
+split_by_commas <- function(tab, column, min = 0, order_it = TRUE){
+  n <- tab[[column]] %>% strsplit(", ", fixed = TRUE) %>% 
+    unlist %>% table %>% sort(decreasing = TRUE)
+  n <- data.frame(f = names(n), n = unclass(n)) %>%
+    dplyr::filter(n > min)
+  if (order_it)
+    n$f  <- factor(n$f, levels = n$f)
+  return(n)
+}
+
+plot_summary_union <- function(tab, 
+                         column="Whether a preprint was posted before publication", 
+                         min=0,
+                         order_it=TRUE, color = TRUE, title = NULL, titlesize = 12, textsize = 12, angle = 45) {
+  
+  n <- split_by_commas(tab, column, min, order_it)
+  
+  if(nrow(n)==2) {
+    colouring <- scale_fill_manual(values = c("No"="#ffffcc", "Yes"="#006837"))
+  } else if(nrow(n)==3) {
+    colouring <- scale_fill_manual(values = c("No"="#ffffcc", "Yes"="#006837", 
+                                              "NA"="grey", "Not Applicable"="grey",
+                                              "Partially"="grey"))
+  } else if(nrow(n)==5) {
+    colouring <- scale_fill_manual(values = c("5"="#ffffcc",
+                                              "4"="#c2e699","3"="#78c679",
+                                                "2"="#31a354","1"="#006837"))
+  } else if (nrow(n) < 10) {
+    colouring <- scale_fill_brewer()
+  } else {
+    colouring <- NULL
+  }
+  if (!is.null(title)) column <- title
+  out <- ggplot(n %>% dplyr::filter(!is.na(f)), 
+         aes(x=f, y=n/sum(n)*100, fill=f)) + 
+    geom_bar(stat="identity", show.legend = FALSE) +
+    xlab("") + ylab("Percentage") +
+    ggtitle(paste0(strwrap(column, 35), collapse = "\n")) +
+    # ggtitle(strwrap(column, 40)) +
+    theme_minimal() + 
+    theme(axis.text.x = element_text(angle = angle, vjust = 1, hjust=1, size=titlesize),
+          text = element_text(size=textsize))
+  if (color) out + colouring else out
+}
+
+```
+
+
+### Variable grouping
+```{r groups}
+
+ans_filtered <- answers_agg %>% 
+  mutate(workflow_system = dplyr::recode(`Type of workflow system used`, 
+                                         nextflow = "Snakemake/Nextflow", 
+                                         Snakemake = "Snakemake/Nextflow"))
+
+open_vars <- c("Licence used for benchmark code", 
+               "Type of benchmark", 
+               "Whether a preprint was posted before publication", 
+               "Degree to which authors are neutral")
+
+repr_vars <- c("Whether any provenance is used", 
+               "Whether methods are run / made available within containers", 
+               "Whether software versions (of all software) are tracked", 
+               "Degree to which code to re-run benchmark is extensible", 
+               "Degree to which code is available")
+
+avail_vars <- c("Whether performance results are explorable", 
+                "Whether performance results (results compared to ground truth) are available", 
+                "Whether results (methods run on data) are available", 
+                "Whether synthetic data is available", 
+                "Whether input data used by the methods is available")
+
+comp_vars <- c("Type of workflow system used")
+
+setup_vars <- c("Number of methods evaluated", 
+                "Number of datasets used in evaluations", 
+                "Number of criteria used for assessment", 
+                "Whether parameter space of methods was explored beyond defaults")
+
+many_vars <- c("For the methods benchmarked, what is/are the primary language/s they are written in?", 
+               "What secondary measures were assessed?")
+
+vars_list <- list(open_vars, setup_vars, comp_vars, avail_vars, repr_vars) %>% 
+  set_names(c("open", "setup", "comp", "avail", "repr"))
+
+```
+
+
+
+## Plot grouped variables 
+
+### Setup_vars
+
+```{r spec, fig.width=5.5, fig.height=4}
+## setup vars
+set_data <- ans_filtered %>% 
+  select(all_of(setup_vars), `Degree to which authors are neutral`) %>% 
+  pivot_longer(!c(`Whether parameter space of methods was explored beyond defaults`,
+                  `Degree to which authors are neutral`), 
+               names_to = "element",
+               values_to = "number") %>% 
+  mutate(element = dplyr::recode(element, 
+                                 `Number of methods evaluated` = "methods", 
+                                 `Number of datasets used in evaluations` = "datasets", 
+                                 `Number of criteria used for assessment` = "criteria"))
+
+fig1a <- ggplot(set_data, aes(x=element, 
+                     y = number)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(size = 1.6, aes(color = element)) +
+  scale_color_brewer(palette = "Set1") + 
+  scale_y_log10() +
+  xlab("benchmark objectives") +
+  theme_minimal() + 
+  theme(legend.position="none", 
+        text = element_text(size=12), 
+        axis.text = element_text(size=12))
+
+# ggsave(file.path(output_dir, "/figures/setup_vars.pdf"), fig1a)
+fig1a
+```
+
+
+```{r}
+
+wflow_colours = list()
+# Licence used for benchmark code
+col <- "Licence used for benchmark code"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+wflow_colours[[col]][c("None", "No code available")] <- "#F76262"
+
+# Licence used for benchmark code
+col <- "For the methods benchmarked, what is/are the primary language/s they are written in?"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+
+# What secondary measures were assessed?
+col <- "What secondary measures were assessed?"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+wflow_colours[[col]][c("none")] <- "#F76262"
+
+# Whether a preprint was posted before publication
+col <- "Whether a preprint was posted before publication"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+wflow_colours[[col]][c("No")] <- "#F76262"
+
+# Whether parameter space of methods was explored beyond defaults
+col <- "Whether parameter space of methods was explored beyond defaults"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+wflow_colours[[col]][c("No")] <- "#F76262"
+
+# Type of benchmark
+col <- "Type of benchmark"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+wflow_colours[[col]][c("Competitive")] <- "#F76262"
+
+# evaluation-task
+col <- "evaluation-task"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+
+# simulator(s)
+col <- "simulator(s)"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+wflow_colours[[col]][c("None")] <- "#F76262"
+
+union_cols <- c(union_cols, 
+               "Whether a preprint was posted before publication", 
+               "Whether parameter space of methods was explored beyond defaults", 
+               "Type of benchmark", 
+               "evaluation-task", 
+               "simulator(s)")
+
+
+table(answers_agg$`Whether a preprint was posted before publication`)/nrow(answers_agg)
+
+
+union_plot_list <- list()
+
+for(unions in union_cols) {
+  if (unions == "For the methods benchmarked, what is/are the primary language/s they are written in?") {
+      q <- plot_summary_union(answers_agg, unions, min = 0, order_it = TRUE, color = FALSE,
+                              title = "For the methods benchmarked, what is/are the primary language/s \nthey are written in?")
+
+  } else if (unions == "evaluation-task"){
+      q <- plot_summary_union(answers_agg, unions, min = 0, order_it = TRUE, color = FALSE,
+                              angle = 65, title = "Benchmark category")
+
+  } else if (unions == "simulator(s)") {
+    q <- plot_summary_union(answers_agg, unions, min = 0, order_it = TRUE, color = FALSE,
+                              title = "Simulator used")
+  } else {
+      q <- plot_summary_union(answers_agg, unions, min = 0, order_it = TRUE, color = FALSE)
+
+  }
+  print(q + scale_x_discrete() + scale_fill_manual(values = wflow_colours[[unions]]))
+  union_plot_list[[unions]] <- q + scale_x_discrete() + scale_fill_manual(values = wflow_colours[[unions]])
+}
+
+length(union_plot_list)
+
+fig1b <- union_plot_list[["evaluation-task"]]
+
+fig1c <- plot_grid(union_plot_list[["Whether a preprint was posted before publication"]],
+                   union_plot_list[["Whether parameter space of methods was explored beyond defaults"]])
+
+
+fig2d <- union_plot_list[["Licence used for benchmark code"]]
+
+```
+
+
+
+### Avail_vars
+```{r avail, warning = FALSE, message=FALSE, fig.width=7, fig.height=3.5}
+# ## avail vars
+# avail_data <- ans_filtered %>% 
+#   select(avail_vars) %>% 
+#   mutate_all(funs(dplyr::recode(.,Yes = 1, No = -1, `Not Applicable` = 0, `Partially` = 0.5))) 
+# 
+# colnames(avail_data) <- c("explorable results", "performance results", "method results", "synthetic data", "input data")
+# 
+# heat <- pheatmap::pheatmap(t(as.matrix(avail_data)),
+#          legend_breaks = c(-1, 0, 1),
+#          color = colorRampPalette(rev(brewer.pal(n = 5, name =
+#   "RdYlBu")))(3),
+#          legend_labels = c("no", "Not applicable", "yes"),
+#          fontsize = 12,
+#          cluster_rows = FALSE,
+#          cluster_cols = TRUE,
+#          #clustering_method = "mcquitty",
+#          #clustering_distance_cols = "minkowski",
+#          border_color = "grey", 
+#          main = "Availability of ...:", 
+#          treeheight_col = 0)
+# 
+# ggsave(file.path(output_dir, "/figures/avail_vars.pdf"), heat)
+
+```
+
+
+### Reproducibility data
+
+#### Repr data overview
+```{r repr dat}
+## reproducibility vars
+repr_data <- ans_filtered %>% 
+  select(all_of(repr_vars), 
+         `Type of workflow system used`) %>% select(-`Whether any provenance is used`) %>% 
+  mutate("comp_environment" = 
+           ifelse(`Whether methods are run / made available within containers` %in% "Yes",
+                  ifelse(`Whether software versions (of all software) are tracked` 
+                         %in% "Yes", "both", "container"), 
+                  ifelse(`Whether software versions (of all software) are tracked` 
+                         %in% "Yes", "software_versions", "none")))
+
+colnames(repr_data) <- c("container", 
+                         "software", 
+                         "code_extensible", 
+                         "code_available",  
+                         "wflow_manager", 
+                         "comp_environment")
+
+
+repr_means <- repr_data %>% summarize(mean_ext = mean(code_extensible), 
+                                      mean_avai = mean(code_available), 
+                                      sd_ext = sd(code_extensible),
+                                      sd_avai = sd(code_available))
+
+repr_means
+
+repr_thresh <- repr_data %>% summarize(n_ext = sum(code_extensible >= 4), 
+                                      n_avai = sum(code_available >= 4), 
+                                      all = nrow(.))
+
+repr_thresh
+
+
+table(repr_data$wflow_manager)
+table(repr_data$comp_environment)
+
+```
+
+#### Repr dotplots
+```{r rerp, fig.width=6, fig.height=4}
+
+# p1 <- ggplot(repr_data, aes(x=code_extensible, y=code_available)) +
+#   geom_jitter(size = 1.6, alpha = 0.8, aes(color = comp_environment)) +
+#   theme_minimal() +
+#   theme(text = element_text(size=14), 
+#         axis.text = element_text(size=12)) +
+#   scale_color_brewer(palette = "Dark2", 
+#                      name = "avail. computational \n environment:") +
+#   xlab("Degree to which code to re-run \n benchmark is extensible") +
+#   ylab("Degree to which code is available") 
+#   
+# p2 <- ggplot(repr_data, aes(x=code_extensible, y=code_available)) +
+#   geom_jitter(size = 1.6, alpha = 0.8, aes(color = wflow_manager)) +
+#   theme_minimal() +
+#   theme(text = element_text(size=14), 
+#         axis.text = element_text(size=12)) +
+#   scale_color_brewer(palette = "Set1", 
+#                      name = "Workflow system") +
+#   xlab("Degree to which code to re-run \n benchmark is extensible") +
+#   ylab("Degree to which code is available") 
+# 
+# ggsave(file.path(output_dir, "/figures/repr_vars_comp_env.pdf"), p1)
+# ggsave(file.path(output_dir, "/figures/repr_vars_wflow.pdf"), p2)
+# p1
+# p2
+
+```
+
+
+#### Repr boxplots
+```{r repr box, fig.width=6, fig.height=4}
+repr_long <- repr_data %>% 
+  select(-container, -software) %>% 
+  pivot_longer(-c(wflow_manager, comp_environment),
+               names_to = "code",
+               values_to = "degree") %>% 
+  mutate(code = dplyr::recode(code, 
+                                 code_extensible = "extensibility", 
+                                 code_available = "availibility"))
+  
+
+#open data
+open_data <- ans_filtered %>% 
+  select(`Degree to which authors are neutral`, setup_vars)
+
+neutr_long <- open_data %>%
+  select(`Degree to which authors are neutral`) %>%
+  pivot_longer(`Degree to which authors are neutral`,
+               names_to = "code", values_to = "degree") %>%
+  mutate(code = dplyr::recode(code,
+                              `Degree to which authors are neutral` = "neutrality"))
+
+# p1 <- ggplot(repr_long, aes(x=code, 
+#                      y = degree)) +
+#   geom_boxplot(outlier.shape = NA) +
+#   geom_jitter(size = 1.6, aes(color = wflow_manager)) +
+#   scale_color_brewer(palette = "Set1") + 
+#   xlab("Code is .. ") +
+#   ylab("Degree [1=not at all, 5=completely]") +
+#   theme_minimal() + 
+#   theme(text = element_text(size=14), 
+#         axis.text = element_text(size=12))
+#   
+# ggsave(file.path(output_dir, "/figures/repr_vars_box.pdf"), p1)
+# p1
+# 
+# p2 <- ggplot(repr_long, aes(x=code, 
+#                      y = degree)) +
+#   geom_boxplot() +
+#   geom_jitter(size = 1.6, aes(color = comp_environment)) +
+#   scale_color_brewer(palette = "Dark2") + 
+#   xlab("Code is .. ") +
+#   ylab("Degree [1=not at all, 5=completely]") +
+#   theme_minimal() + 
+#   theme(text = element_text(size=14), 
+#         axis.text = element_text(size=12))
+# 
+# ggsave(file.path(output_dir, "/figures/repr_vars_box_comp_env.pdf"), p2)
+# p2
+
+```
+
+
+#### Repr densities
+```{r, fig.width=6, fig.height=4}
+cols_av = c("#ffa600", "#003f5c")
+p4 <- ggplot(repr_long, aes(x=code, 
+                     y = degree)) +
+  ggdist::stat_halfeye(
+    adjust = .5, 
+    width = .6, 
+    .width = 0, 
+    justification = -.3, 
+    point_colour = NA) + 
+  geom_boxplot(
+    outlier.shape = NA,
+    width = 0.25,
+    aes(fill = code, alpha = 0.4)
+    ) + 
+  geom_point(
+    size = 1.6, aes(color = code),
+    position = position_jitter(
+      seed = 1, width = .1
+    )
+    ) +
+  scale_colour_manual(values = cols_av) +
+  scale_fill_manual(values = cols_av) +
+  ylab("Degree [1='not at all', 5='completely']") +
+  theme_minimal() + 
+  ggtitle("Code status:") +
+  theme(
+    legend.position="none",
+    text = element_text(size=12), 
+    axis.text = element_text(size=12),
+    axis.title.y=element_blank()
+    ) + 
+  coord_flip()
+
+
+table(repr_long$code, repr_long$degree>1)
+
+
+
+table(answers_agg$`Licence used for benchmark code`,
+      answers_agg$`Degree to which code is available`>1)
+
+
+p5 <- ggplot(neutr_long, aes(x=code, 
+                     y = degree)) +
+  ggdist::stat_halfeye(
+    adjust = .5, 
+    width = .6, 
+    .width = 0, 
+    justification = -.3, 
+    point_colour = NA) + 
+  geom_boxplot(
+    outlier.shape = NA,
+    width = 0.25,
+    aes(fill = code, alpha = 0.4)
+    ) + 
+  geom_point(
+    size = 1.6, aes(color = code),
+    position = position_jitter(
+      seed = 1, width = .1
+    )
+    ) +
+  scale_colour_manual(values = "darkgreen") +
+  scale_fill_manual(values = "darkgreen") +
+  ylab("Degree [1='not at all', 5='completely']") +
+  theme_minimal() + 
+  ggtitle("\tBenchmarking neutrality") +
+  theme(
+    legend.position="none",
+    text = element_text(size=12), 
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(size=12),
+    axis.title.y=element_blank()
+    ) + 
+  coord_flip()
+
+(fig1d <- p5)
+
+
+p4
+fig2c <- p4
+
+# ggsave(file.path(output_dir, "/figures/avail_ext_box_flip.pdf"), p4)
+
+```
+
+
+### Many vars
+```{r}
+
+mean(ans_filtered$workflow_system %in% c("make","R package","Snakemake/Nextflow"))
+
+p_wflow <- plot_summary_cat(ans_filtered, column = "Type of workflow system used")
+wflow_colours = c("#e41a1c","#377eb8", "#4daf4a",
+                  "#984ea3","#ff7f00","#ffff33")
+names(wflow_colours) <- c("make", "NA", "nextflow", "none", "R package", "Snakemake")
+p <- p_wflow + scale_fill_manual(values = wflow_colours)
+
+# ggsave(file.path(output_dir, "/figures/summary_cat.pdf"), p)
+(fig2b <- p)
+```
+
+### Wflow system and parameter
+```{r wflow_param, eval=FALSE, echo=FALSE}
+n <- answers_agg %>% 
+  group_by(!!as.name("Type of workflow system used"), 
+           !!as.name("Whether parameter space of methods was explored beyond defaults")) %>%
+  tally() %>% mutate(f = !!as.name("Type of workflow system used")) %>% arrange(desc(n))
+
+n$f <- fct_collapse(n$f, `none/NA` = c("none","NA"), `R based\n workflow` = c("R package"))
+n <-  n %>% 
+  group_by(f, !!as.name("Whether parameter space of methods was explored beyond defaults")) %>% 
+  summarise(n = sum(n)) %>% 
+  mutate(param = !!as.name("Whether parameter space of methods was explored beyond defaults")) %>%
+  arrange(desc(n))
+
+# ggplot(n, 
+#          aes(x=f, y=n, fill=param)) + 
+#     geom_bar(stat="identity", show.legend = TRUE) +
+#     xlab("") + ylab("Percentage") +
+#     ggtitle("Type of workflow system used") +
+#     theme_minimal() +
+#     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=16),
+#           text = element_text(size=12)) 
+
+```
+
+
+### Open vars
+```{r open}
+pal <- wes_palette("Zissou1", 10, type = "continuous")
+
+table(open_data$`Whether parameter space of methods was explored beyond defaults`)/nrow(open_data)
+
+
+# ggplot(open_data, aes(x=`Degree to which authors are neutral`, y=`Number of methods evaluated`)) +
+#   geom_jitter(size = 1.6, alpha = 0.8, aes(color = `Whether parameter space of methods was explored beyond defaults`)) +
+#   theme_minimal() +
+#   theme(text = element_text(size=14), 
+#         axis.text = element_text(size=12)) +
+#   scale_color_brewer(palette = "Set1", 
+#                      name = "Parameter space \n explored") +
+#   xlab("Degree to which authors are neutral") +
+#   ylab("Number of methods evaluated")
+# 
+# 
+# ggplot(open_data, aes(x=`Degree to which authors are neutral`, y=`Number of datasets used in evaluations`)) +
+#   geom_jitter(size = 1.6, alpha = 0.8, aes(color = `Whether parameter space of methods was explored beyond defaults`)) +
+#   theme_minimal() +
+#   scale_y_log10() +
+#   theme(text = element_text(size=14), 
+#         axis.text = element_text(size=12)) +
+#   scale_color_brewer(palette = "Set1", 
+#                      name = "Parameter space \n explored") +
+#   xlab("Degree to which authors are neutral") +
+#   ylab("Number of datasets used in evaluations")
+# 
+# 
+# ggplot(open_data, aes(x=`Degree to which authors are neutral`, y=`Number of criteria used for assessment`)) +
+#   geom_jitter(size = 1.6, alpha = 0.8, aes(color = `Whether parameter space of methods was explored beyond defaults`)) +
+#   theme_minimal() +
+#   theme(text = element_text(size=14), 
+#         axis.text = element_text(size=12)) +
+#   scale_color_brewer(palette = "Set1", 
+#                      name = "Parameter space \n explored") +
+#   xlab("Degree to which authors are neutral") +
+#   ylab("Number of criteria used for assessment")
+# 
+# 
+# neutral_data <- open_data %>% 
+#   select(`Degree to which authors are neutral`) %>% 
+#   pivot_longer(`Degree to which authors are neutral`,
+#                names_to = "question",
+#                values_to = "degree")
+# 
+# ggplot(neutral_data, aes(x=question, 
+#                      y = degree)) +
+#   geom_boxplot(outlier.shape = NA) +
+#   geom_jitter(size = 1.6, aes(color = degree)) +
+#   #scale_color_viridis(option = "D") +
+#   #scale_color_distiller(palette = "RdYlBu") +
+#   scale_colour_gradientn(colours = rev(pal)) +
+#   xlab("Question") +
+#   ylab("Degree [1=not at all, 5=completely]") +
+#   theme_minimal() + 
+#   theme(text = element_text(size=14), 
+#         axis.text = element_text(size=12))
+
+```
+
+## Mixed groups
+### Heatmap availability - code
+```{r compheatmap, fig.width=12, fig.height=5}
+repr_select <- c("Whether any provenance is used", 
+                 "Whether methods are run / made available within containers",
+                 "Whether software versions (of all software) are tracked")
+
+avail_heat_data <- ans_filtered %>% 
+  select(avail_vars, all_of(repr_select)) %>% 
+  mutate_all(funs(dplyr::recode(.,Yes = -1, No = 1, `Not Applicable` = 0, `Partially` = -0.5))) 
+
+colnames(avail_heat_data) <- c("performance results explorable",
+                               "performance results (results compared to ground truth) available",
+                               "results (methods run on data) available",
+                               "synthetic data available",
+                               "input data available",
+                               "provenance used",
+                               "methods run within containers",
+                               "software versions tracked")
+
+repr_heat_data <- ans_filtered %>% 
+  select(all_of(repr_select)) %>% 
+  mutate_all(funs(dplyr::recode(.,Yes = -1, No = 1, `Not Applicable` = 0, `Partially` = -0.5))) 
+
+cols = structure(c("#1a75ff", "#ffa31a", "#ffffff", "#e60000"), names = c("-1", "-0.5", "0", "1"))
+
+h <- Heatmap(t(avail_heat_data),
+        show_row_dend = FALSE,
+        show_column_dend = FALSE,
+        rect_gp = gpar(col = "black", lwd = 1),
+        col = cols,
+        row_split = c(rep("avail", 5), rep("repr", 3)),
+        row_title = NULL,
+        #width = unit(16, "cm"), 
+        height = unit(5, "cm"),
+        row_gap = unit(3, "mm"),
+        heatmap_width = unit(25, "cm"),
+        heatmap_legend_param = list(labels = c("Yes", "Partially", "Not Applicable", "No"),
+                                    title = "\n\n\n\nResponse",
+                                    border = "black"))
+
+
+# (fig2a <- h)
+
+mean(avail_heat_data$`input data available`!=1)
+
+mean(avail_heat_data$`performance results (results compared to ground truth) available`!=1)
+
+mean(avail_heat_data$`performance results explorable`!=1)
+
+mean(avail_heat_data$`software versions tracked`!=1)
+
+mean(avail_heat_data$`methods run within containers`!=1)
+
+table(avail_heat_data$`synthetic data available`)
+
+
+
+
+
+# 
+# ?plot_grid
+# 
+# grid.newpage()
+# pushViewport(viewport(x = 0, y = 0.5, width = 1, 
+#                       height = 0.5, just = c("left", "bottom")))
+# grid.draw(gb_heatmap)
+# grid.text("A", x = .05, .95, just = "left")
+# popViewport()
+# 
+# pushViewport(viewport(x = 0, y = 0, width = 0.5, 
+#                       height = 0.5, just = c("left", "bottom")))
+# grid.draw(grid.grabExpr(print(fig2b)))
+# popViewport()
+# 
+
+
+
+# plot_grid(grob, fig2b, fig2c, rel_widths = c(1, .5, .5), rel_heights = .5)
+# 
+# pdf(file.path(output_dir, "/figures/comp_heatmap.pdf"), width = 12, height = 4.5)
+# draw(h)
+# dev.off()
+# 
+# 
+
+```
+
+
+## Combined figures
+```{r}
+pg <- plot_grid(fig1a, fig1b, fig1c, fig1d, 
+          labels = c("A","B","C","D"),
+          label_size = 22, scale=.95,
+          nrow=2, ncol=2)
+
+ggsave(file.path(output_dir, "/figures/fig1.pdf"), pg,
+       width=15, height=10)
+
+
+
+
+top = grid.grabExpr(draw(fig2a, padding = unit(c(.2, .2, .2, .2), "mm")))
+
+bot <- plot_grid(fig2b, fig2c, fig2d, nrow=1, ncol=3,
+          labels = c("B","C","D"), label_size = 22, scale = .95)
+
+
+pg <- plot_grid(top, bot, nrow=2, ncol=1, 
+                labels = c("A",""), label_size = 22)
+pg    
+ggsave(file.path(output_dir, "/figures/fig2.pdf"), pg,
+       width=15, height=10)      
+          
+
+```
+
+## Sessioninfo
+```{r sessioninfo}
+sessionInfo()
+```
+

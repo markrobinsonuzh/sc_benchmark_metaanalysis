@@ -30,6 +30,8 @@ suppressPackageStartupMessages({
     library(ggrepel)
 })
 
+output_dir <- here::here("output")
+
 options(gargle_oauth_email = TRUE)
 stub <- "https://docs.google.com/spreadsheets/d/"
 # answers_sheet <- paste0(stub, 
@@ -165,10 +167,10 @@ table(code_available = round(answers_agg$`Degree to which code is available`),
       workflow_used = answers_agg$`Type of workflow system used`)
 
 
-saveRDS(answers_agg, file="answers_agg.rds")
-saveRDS(numeric_cols, file="numeric_cols.rds")
-saveRDS(categ_cols, file="categ_cols.rds")
-saveRDS(union_cols, file="union_cols.rds")
+saveRDS(answers_agg, file=file.path(output_dir,"answers_agg.rds"))
+saveRDS(numeric_cols, file=file.path(output_dir,"numeric_cols.rds"))
+saveRDS(categ_cols, file=file.path(output_dir,"categ_cols.rds"))
+saveRDS(union_cols, file=file.path(output_dir,"union_cols.rds"))
 
 ```
 
