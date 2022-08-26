@@ -58,6 +58,17 @@ answers_agg <- answers_agg %>%
   dplyr::left_join(answers %>% 
                      dplyr::select("title", "evaluation-task", "simulator(s)"))
 
+k <- answers_agg$`Licence used for benchmark code`
+answers_agg$`Licence used for benchmark code`[k=="MIT License"] <- "MIT"
+answers_agg$`Licence used for benchmark code`[k=="GPL-3, MIT"] <- "GPLv3, MIT"
+
+k <- answers_agg$`Type of workflow system used`
+answers_agg$`Type of workflow system used`[k=="R package"] <- "R-based workflow"
+answers_agg$`Type of workflow system used`[k=="NA"] <- "No code available"
+
+
+table(answers_agg$`Licence used for benchmark code`, 
+      answers_agg$`Type of workflow system used`)
 ```
 
 ### Functions
@@ -258,6 +269,15 @@ elem <- rownames(split_by_commas(answers_agg, col))
 wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
 names(wflow_colours[[col]]) <- unique(elem)
 
+
+# Type of workflow system used
+col <- "Type of workflow system used"
+elem <- rownames(split_by_commas(answers_agg, col))
+wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
+names(wflow_colours[[col]]) <- unique(elem)
+wflow_colours[[col]][c("None", "No code available")] <- "#F76262"
+
+
 # simulator(s)
 col <- "simulator(s)"
 elem <- rownames(split_by_commas(answers_agg, col))
@@ -269,6 +289,7 @@ union_cols <- c(union_cols,
                "Whether a preprint was posted before publication", 
                "Whether parameter space of methods was explored beyond defaults", 
                "Type of benchmark", 
+               "Type of workflow system used",
                "evaluation-task", 
                "simulator(s)")
 
@@ -307,6 +328,14 @@ fig1c <- plot_grid(union_plot_list[["Whether a preprint was posted before public
 
 
 fig2d <- union_plot_list[["Licence used for benchmark code"]]
+
+fig2b <- union_plot_list[["Type of workflow system used"]]
+
+
+suppfig1a <- union_plot_list[["simulator(s)"]]
+suppfig1b <- union_plot_list[["What secondary measures were assessed?"]]
+suppfig1c <- union_plot_list[["For the methods benchmarked, what is/are the primary language/s they are written in?"]]
+
 
 ```
 
@@ -422,7 +451,7 @@ repr_long <- repr_data %>%
                values_to = "degree") %>% 
   mutate(code = dplyr::recode(code, 
                                  code_extensible = "extensibility", 
-                                 code_available = "availibility"))
+                                 code_available = "availability"))
   
 
 #open data
@@ -567,7 +596,7 @@ names(wflow_colours) <- c("make", "NA", "nextflow", "none", "R package", "Snakem
 p <- p_wflow + scale_fill_manual(values = wflow_colours)
 
 # ggsave(file.path(output_dir, "/figures/summary_cat.pdf"), p)
-(fig2b <- p)
+# (fig2b <- p)
 ```
 
 ### Wflow system and parameter
@@ -700,7 +729,7 @@ h <- Heatmap(t(avail_heat_data),
                                     border = "black"))
 
 
-# (fig2a <- h)
+(fig2a <- h)
 
 mean(avail_heat_data$`input data available`!=1)
 
@@ -770,8 +799,14 @@ pg <- plot_grid(top, bot, nrow=2, ncol=1,
                 labels = c("A",""), label_size = 22)
 pg    
 ggsave(file.path(output_dir, "/figures/fig2.pdf"), pg,
-       width=15, height=10)      
+       width=12, height=8)      
           
+
+supp <- plot_grid(suppfig1a, suppfig1b, suppfig1c, nrow=3, ncol=1, scale = .95)
+
+ggsave(file.path(output_dir, "/figures/suppfig.pdf"), supp,
+       width=6, height=12)      
+
 
 ```
 
