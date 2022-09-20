@@ -36,6 +36,11 @@ suppressPackageStartupMessages({
     library(forcats)
 })
 
+## to avoid implicit calls to gs4_auth() on non-interactive sessions, i.e.
+## Error in `gs4_auth()`:
+## ! Can't get Google credentials.
+googlesheets4::gs4_deauth()
+
 output_dir <- here("output")
 
 answers_agg <- readRDS(file.path(output_dir,"answers_agg.rds"))
@@ -796,6 +801,13 @@ table(avail_heat_data$`synthetic data available`)
 
 
 ## Combined figures
+
+```{r}
+## to avoid errors while knitting directly, without workflowr
+dir.create(file.path(output_dir, 'figures'), showWarnings = FALSE)
+```
+
+
 ```{r}
 pg <- plot_grid(fig1a, fig1b, fig1c, fig1d, 
           labels = c("A","B","C","D"),
