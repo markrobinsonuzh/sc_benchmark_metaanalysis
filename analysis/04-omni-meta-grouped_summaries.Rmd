@@ -12,7 +12,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Summary plots meta analysis 
 
-Libraries
+This document contains the code to make the figures, as well as a bunch of other visualizations that were not used.
+
+### Libraries
 ```{r libs}
 
 suppressPackageStartupMessages({
@@ -48,6 +50,7 @@ answers_agg$`Degree to which authors are neutral` <- 6-w
 w <- answers_agg$`Degree to which code to re-run benchmark is extensible`
 answers_agg$`Degree to which code to re-run benchmark is extensible` <- 6-w
 
+
 bench_gs <- "https://docs.google.com/spreadsheets/d/1JzFnpFrhM8P-WF2pct6uu1AsJMUBI_tubgbkdyS5aV8/edit#gid=0"
 suppressMessages({
 answers <- googlesheets4::read_sheet(bench_gs) %>%
@@ -61,6 +64,7 @@ answers_agg <- answers_agg %>%
 k <- answers_agg$`Licence used for benchmark code`
 answers_agg$`Licence used for benchmark code`[k=="MIT License"] <- "MIT"
 answers_agg$`Licence used for benchmark code`[k=="GPL-3, MIT"] <- "GPLv3, MIT"
+answers_agg$`Licence used for benchmark code`[k=="GPL-3"] <- "GPLv3"
 
 k <- answers_agg$`Type of workflow system used`
 answers_agg$`Type of workflow system used`[k=="R package"] <- "R-based workflow"
@@ -571,7 +575,7 @@ p5 <- ggplot(neutr_long, aes(x=code,
   scale_fill_manual(values = "darkgreen") +
   ylab("Degree [1='not at all', 5='completely']") +
   theme_minimal() + 
-  ggtitle("\tBenchmarking neutrality") +
+  ggtitle("Benchmarking neutrality") +
   theme(
     legend.position="none",
     text = element_text(size=12), 
@@ -795,8 +799,9 @@ table(avail_heat_data$`synthetic data available`)
 ```{r}
 pg <- plot_grid(fig1a, fig1b, fig1c, fig1d, 
           labels = c("A","B","C","D"),
-          label_size = 22, scale=.95,
+          label_size = 22, scale=c(.95,.95,.95,.87),
           nrow=2, ncol=2)
+pg
 
 ggsave(file.path(output_dir, "/figures/fig1.pdf"), pg,
        width=15, height=10)

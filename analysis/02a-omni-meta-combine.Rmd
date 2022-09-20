@@ -169,6 +169,9 @@ saveRDS(numeric_cols, file=file.path(output_dir,"numeric_cols.rds"))
 saveRDS(categ_cols, file=file.path(output_dir,"categ_cols.rds"))
 saveRDS(union_cols, file=file.path(output_dir,"union_cols.rds"))
 
+write.table(answers_agg, file.path(output_dir,"benchmark-meta-analysis-addFile3.txt"),
+          quote = FALSE, row.names = FALSE, sep = "\t")
+
 ```
 
 
