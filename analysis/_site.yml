@@ -9,6 +9,12 @@ navbar:
     href: about.html
   - text: License
     href: license.html
+  - text: Monitoring
+    href: 01-omni-meta-report.html
+  - text: Combining
+    href: 02a-omni-meta-combine.html
+  - text: Figures
+    href: 04-omni-meta-grouped_summaries.html
 output:
   workflowr::wflow_html:
     toc: yes
