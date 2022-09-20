@@ -19,11 +19,12 @@ knitr::opts_chunk$set(echo = TRUE)
 #rmarkdown::render("analysis/03-omni-meta-barplot-summaries.Rmd", rmarkdown::html_document())
 
 suppressPackageStartupMessages({
-    library(dplyr)
-    library(ggplot2)
-    library(tidyr)
-    library(ggrepel)
-    library(cowplot)
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(ggrepel)
+  library(cowplot)
+  library(RColorBrewer)
 })
 
 answers_agg <- readRDS("output/answers_agg.rds")
@@ -33,6 +34,7 @@ union_cols <- readRDS("output/union_cols.rds")
 
 ```
 
+This document is not really used, although might have lead to the ideas/code later on for the plots. It's included here simply for completeness.
 
 ## Define functions
 
@@ -244,7 +246,7 @@ m <- m[,co]
 library(ComplexHeatmap)
 
 
-pdf("heatmap.pdf", width=10, height=2)
+# pdf("heatmap.pdf", width=10, height=2)
 # png("heatmap.png", width=2000, height=400)
 Heatmap(m, col=c("cornflowerblue","lightyellow","orange","red"), 
         row_gap = unit(4, "mm"),
@@ -252,7 +254,7 @@ Heatmap(m, col=c("cornflowerblue","lightyellow","orange","red"),
         row_names_gp = gpar(fontsize = 8),
         border = TRUE, rect_gp = gpar(col = "black"),
         heatmap_legend_param = list(title = "Response"))
-dev.off()
+# dev.off()
 
 
 

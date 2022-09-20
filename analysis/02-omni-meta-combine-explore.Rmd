@@ -33,16 +33,14 @@ suppressPackageStartupMessages({
 
 options(gargle_oauth_email = TRUE)
 stub <- "https://docs.google.com/spreadsheets/d/"
-# answers_sheet <- paste0(stub, 
-#                         "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
-# answers_sheet <- paste0(stub, 
-#                         "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
 answers_sheet <- paste0(stub, 
-                        "1ZMdGOv_ifRv9AWY-pIrXdzI4j9upeEvCI2aeRdLe94E")
+                        "1ZMdGOv_ifRv9AWY-pIrXdzI4j9upeEvCI2aeRdLe94E") # restricted
 
 
 
 ```
+
+Again, this document is mostly for monitoring the modified/consolidated responses, and checks for discrepancies or large differences in opinion, in order to find where to adjust the responses with a third reviewer.
 
 
 ## Functions

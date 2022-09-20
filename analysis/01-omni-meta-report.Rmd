@@ -36,11 +36,12 @@ suppressPackageStartupMessages({
 
 options(gargle_oauth_email = TRUE)
 stub <- "https://docs.google.com/spreadsheets/d/"
-input_sheet <- paste0(stub, "1JzFnpFrhM8P-WF2pct6uu1AsJMUBI_tubgbkdyS5aV8")
-signup_sheet <- paste0(stub, "1h8hLUWiF9hw_JDKo2OaYSsuk4SvsyrdtL0JDKczZJFo")
-review_sheet <- paste0(stub, "1ljxV2bXVSq7ypwFndAnYOFO06akMBA0_8br-wMnYxR8")
+input_sheet <- paste0(stub, "1JzFnpFrhM8P-WF2pct6uu1AsJMUBI_tubgbkdyS5aV8") # open
+signup_sheet <- paste0(stub, "1h8hLUWiF9hw_JDKo2OaYSsuk4SvsyrdtL0JDKczZJFo") # restricted
+review_sheet <- paste0(stub, "1ljxV2bXVSq7ypwFndAnYOFO06akMBA0_8br-wMnYxR8") # restricted
 ```
 
+This document is primarily for monitoring the signups and completion of reviews. Thus, some Google Sheets are restricted and not available publicly.
 
 ## Papers
 
@@ -127,7 +128,7 @@ ggplot(reviewers, aes(n,committed, label=reviewer)) +
 ## Missing reviews
 
 ```{r missing-reviews}
-DT::datatable(signup %>% filter(is.na(Timestamp)) %>% select(-Timestamp))
+# DT::datatable(signup %>% filter(is.na(Timestamp)) %>% select(-Timestamp))
 ```
 
 <!-- ## Simulators -->
@@ -140,10 +141,10 @@ DT::datatable(signup %>% filter(is.na(Timestamp)) %>% select(-Timestamp))
 <!-- }) -->
 
 <!-- sims <- benchmarks$`simulator(s)` -->
-<!-- sims <- lapply(sims, strsplit, ", ") %>% unlist %>%  -->
+<!-- sims <- lapply(sims, strsplit, ", ") %>% unlist %>% -->
 <!--   table %>% sort(decreasing = TRUE) -->
 
-<!-- ggplot(data.frame(simulator=names(sims), n=as.integer(sims)) %>%  -->
+<!-- ggplot(data.frame(simulator=names(sims), n=as.integer(sims)) %>% -->
 <!--          dplyr::filter(!(simulator == "–")), -->
 <!--        aes(x=simulator, y=n)) + geom_bar(stat="identity") + -->
 <!--   theme(axis.text.x = element_text(angle = 45, hjust=1)) + -->

@@ -34,17 +34,14 @@ output_dir <- here::here("output")
 
 options(gargle_oauth_email = TRUE)
 stub <- "https://docs.google.com/spreadsheets/d/"
-# answers_sheet <- paste0(stub, 
-#                         "1lK1NOlraC9hNjl6XiW4ZRG6TbkQBo25ejVNBv4Cxj9k")
-# answers_sheet <- paste0(stub, 
-#                         "1P0gS9F5ebdrtCghbLAN-YkY0Novc2tqhSM5ckCEj0gI")
 answers_sheet <- paste0(stub, 
-                        "1ZMdGOv_ifRv9AWY-pIrXdzI4j9upeEvCI2aeRdLe94E")
+                        "1ZMdGOv_ifRv9AWY-pIrXdzI4j9upeEvCI2aeRdLe94E") # restricted
 
 
 
 ```
 
+The purpose of this document is to consolidate the reviews into a single response for each benchmark paper. The results are stored below in RDS files, and then used in the next document to make the figures for the paper. Here, some spot checks are added to check for consistency of answers.
 
 ## Answers
 

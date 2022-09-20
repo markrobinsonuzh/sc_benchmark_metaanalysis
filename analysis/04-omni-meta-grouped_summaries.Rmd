@@ -1,6 +1,6 @@
 ---
 title: "Various summaries - Benchmark meta-analysis"
-author: Almut Lütge
+author: Almut Lütge, Anthony Sonrel, Mark Robinson
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -196,19 +196,21 @@ set_data <- ans_filtered %>%
   pivot_longer(!c(`Whether parameter space of methods was explored beyond defaults`,
                   `Degree to which authors are neutral`), 
                names_to = "element",
-               values_to = "number") %>% 
+               values_to = "Number") %>% 
   mutate(element = dplyr::recode(element, 
-                                 `Number of methods evaluated` = "methods", 
-                                 `Number of datasets used in evaluations` = "datasets", 
-                                 `Number of criteria used for assessment` = "criteria"))
+                                 `Number of methods evaluated` = "Methods", 
+                                 `Number of datasets used in evaluations` = "Datasets", 
+                                 `Number of criteria used for assessment` = "Criteria")) %>%
+  mutate(element = factor(element, levels = c("Datasets", 
+                                              "Methods", "Criteria")))
 
 fig1a <- ggplot(set_data, aes(x=element, 
-                     y = number)) +
+                     y = Number)) +
   geom_boxplot(outlier.shape = NA) +
-  geom_jitter(size = 1.6, aes(color = element)) +
+  geom_jitter(size = 1.4, aes(color = element)) +
   scale_color_brewer(palette = "Set1") + 
   scale_y_log10() +
-  xlab("benchmark objectives") +
+  xlab("Benchmark component") +
   theme_minimal() + 
   theme(legend.position="none", 
         text = element_text(size=12), 
@@ -240,7 +242,7 @@ col <- "What secondary measures were assessed?"
 elem <- rownames(split_by_commas(answers_agg, col))
 wflow_colours[[col]] = rep("#7E7E7E", length(unique(elem)))
 names(wflow_colours[[col]]) <- unique(elem)
-wflow_colours[[col]][c("none")] <- "#F76262"
+wflow_colours[[col]][c("None")] <- "#F76262"
 
 # Whether a preprint was posted before publication
 col <- "Whether a preprint was posted before publication"
@@ -311,6 +313,10 @@ for(unions in union_cols) {
   } else if (unions == "simulator(s)") {
     q <- plot_summary_union(answers_agg, unions, min = 0, order_it = TRUE, color = FALSE,
                               title = "Simulator used")
+  } else if (unions %in% c("Whether a preprint was posted before publication",
+                           "Whether parameter space of methods was explored beyond defaults")) {
+      q <- plot_summary_union(answers_agg, unions, min = 0, order_it = FALSE, color = FALSE)
+
   } else {
       q <- plot_summary_union(answers_agg, unions, min = 0, order_it = TRUE, color = FALSE)
 
@@ -451,12 +457,14 @@ repr_long <- repr_data %>%
                values_to = "degree") %>% 
   mutate(code = dplyr::recode(code, 
                                  code_extensible = "extensibility", 
-                                 code_available = "availability"))
+                                 code_available = "availability")) %>%
+  mutate(code = factor(code, levels = c("extensibility","availability")))
+
   
 
 #open data
 open_data <- ans_filtered %>% 
-  select(`Degree to which authors are neutral`, setup_vars)
+  select(`Degree to which authors are neutral`, all_of(setup_vars))
 
 neutr_long <- open_data %>%
   select(`Degree to which authors are neutral`) %>%
@@ -711,9 +719,15 @@ repr_heat_data <- ans_filtered %>%
   select(all_of(repr_select)) %>% 
   mutate_all(funs(dplyr::recode(.,Yes = -1, No = 1, `Not Applicable` = 0, `Partially` = -0.5))) 
 
-cols = structure(c("#1a75ff", "#ffa31a", "#ffffff", "#e60000"), names = c("-1", "-0.5", "0", "1"))
+cols = structure(c("#1a75ff", "#ffa31a", "#ffffff", "#e60000"), 
+                 names = c("-1", "-0.5", "0", "1"))
 
-h <- Heatmap(t(avail_heat_data),
+data_for_hm <- t(avail_heat_data)
+colnames(data_for_hm) <- as.character(seq_len(ncol(data_for_hm)))
+colnames(data_for_hm) <- rep("", ncol(data_for_hm))
+colnames(data_for_hm)[16] <- "benchmarks"
+
+h <- Heatmap(data_for_hm,
         show_row_dend = FALSE,
         show_column_dend = FALSE,
         rect_gp = gpar(col = "black", lwd = 1),
@@ -726,7 +740,8 @@ h <- Heatmap(t(avail_heat_data),
         heatmap_width = unit(25, "cm"),
         heatmap_legend_param = list(labels = c("Yes", "Partially", "Not Applicable", "No"),
                                     title = "\n\n\n\nResponse",
-                                    border = "black"))
+                                    border = "black"),
+        column_names_rot = 0)
 
 
 (fig2a <- h)
@@ -805,7 +820,7 @@ ggsave(file.path(output_dir, "/figures/fig2.pdf"), pg,
 supp <- plot_grid(suppfig1a, suppfig1b, suppfig1c, nrow=3, ncol=1, scale = .95)
 
 ggsave(file.path(output_dir, "/figures/suppfig.pdf"), supp,
-       width=6, height=12)      
+       width=8, height=10)      
 
 
 ```

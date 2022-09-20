@@ -7,4 +7,4 @@ editor_options:
   chunk_output_type: console
 ---
 
-Describe your project.
+This project includes the R code for running the reviews (i.e., via signups) and for monitoring and then consolidating the response, as well as making the figures for the manuscript.
