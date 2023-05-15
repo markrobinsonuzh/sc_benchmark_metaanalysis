@@ -100,8 +100,8 @@ plot_summary_cat <- function(tab,
     xlab("") + ylab("Percentage") +
     ggtitle(column) +
     theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=12),
-          text = element_text(size=12)) 
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=14),
+          text = element_text(size=14)) 
 }
 
 split_by_commas <- function(tab, column, min = 0, order_it = TRUE){
@@ -117,7 +117,7 @@ split_by_commas <- function(tab, column, min = 0, order_it = TRUE){
 plot_summary_union <- function(tab, 
                          column="Whether a preprint was posted before publication", 
                          min=0,
-                         order_it=TRUE, color = TRUE, title = NULL, titlesize = 12, textsize = 12, angle = 45) {
+                         order_it=TRUE, color = TRUE, title = NULL, titlesize = 14, textsize = 14, angle = 45) {
   
   n <- split_by_commas(tab, column, min, order_it)
   
@@ -141,7 +141,7 @@ plot_summary_union <- function(tab,
          aes(x=f, y=n/sum(n)*100, fill=f)) + 
     geom_bar(stat="identity", show.legend = FALSE) +
     xlab("") + ylab("Percentage") +
-    ggtitle(paste0(strwrap(column, 35), collapse = "\n")) +
+    ggtitle(paste0(strwrap(column, 25), collapse = "\n")) +
     # ggtitle(strwrap(column, 40)) +
     theme_minimal() + 
     theme(axis.text.x = element_text(angle = angle, vjust = 1, hjust=1, size=titlesize),
@@ -222,8 +222,8 @@ fig1a <- ggplot(set_data, aes(x=element,
   xlab("Benchmark component") +
   theme_minimal() + 
   theme(legend.position="none", 
-        text = element_text(size=12), 
-        axis.text = element_text(size=12))
+        text = element_text(size=14), 
+        axis.text = element_text(size=14))
 
 # ggsave(file.path(output_dir, "/figures/setup_vars.pdf"), fig1a)
 fig1a
@@ -542,8 +542,8 @@ p4 <- ggplot(repr_long, aes(x=code,
   ggtitle("Code status:") +
   theme(
     legend.position="none",
-    text = element_text(size=12), 
-    axis.text = element_text(size=12),
+    text = element_text(size=14), 
+    axis.text = element_text(size=14),
     axis.title.y=element_blank()
     ) + 
   coord_flip()
@@ -583,9 +583,9 @@ p5 <- ggplot(neutr_long, aes(x=code,
   ggtitle("Benchmarking neutrality") +
   theme(
     legend.position="none",
-    text = element_text(size=12), 
+    text = element_text(size=14), 
     axis.text.y = element_blank(),
-    axis.text.x = element_text(size=12),
+    axis.text.x = element_text(size=14),
     axis.title.y=element_blank()
     ) + 
   coord_flip()
@@ -736,6 +736,14 @@ colnames(data_for_hm) <- as.character(seq_len(ncol(data_for_hm)))
 colnames(data_for_hm) <- rep("", ncol(data_for_hm))
 colnames(data_for_hm)[16] <- "benchmarks"
 
+rnhm <- rownames(data_for_hm)
+
+rnhm[rnhm == "performance results (results compared to ground truth) available"] <- "performance results available"
+rnhm[rnhm == "results (methods run on data) available"] <- "results available"
+rnhm[rnhm == "methods run within containers"] <- "methods containerized"
+
+rownames(data_for_hm) <- rnhm
+
 h <- Heatmap(data_for_hm,
         show_row_dend = FALSE,
         show_column_dend = FALSE,
@@ -743,14 +751,19 @@ h <- Heatmap(data_for_hm,
         col = cols,
         row_split = c(rep("avail", 5), rep("repr", 3)),
         row_title = NULL,
-        #width = unit(16, "cm"), 
+        row_title_gp = gpar(fontsize = .1),
+        # width = unit(16, "cm"), 
         height = unit(5, "cm"),
         row_gap = unit(3, "mm"),
-        heatmap_width = unit(25, "cm"),
+        heatmap_width = unit(30, "cm"),
         heatmap_legend_param = list(labels = c("Yes", "Partially", "Not Applicable", "No"),
-                                    title = "\n\n\n\nResponse",
+                                    title = "\n\n\n\nResponse", at = c(-1,-.5,0,1),
+                                    legend_height = unit(8, "cm"),
                                     border = "black"),
+        row_names_gp = grid::gpar(fontsize = 16),
+        column_names_gp = grid::gpar(fontsize = 18),
         column_names_rot = 0)
+h
 
 
 (fig2a <- h)
@@ -811,7 +824,7 @@ dir.create(file.path(output_dir, 'figures'), showWarnings = FALSE)
 ```{r}
 pg <- plot_grid(fig1a, fig1b, fig1c, fig1d, 
           labels = c("A","B","C","D"),
-          label_size = 22, scale=c(.95,.95,.95,.87),
+          label_size = 22, scale=c(.90,.90,.90,.87),
           nrow=2, ncol=2)
 pg
 
@@ -821,7 +834,7 @@ ggsave(file.path(output_dir, "/figures/fig1.pdf"), pg,
 
 
 
-top = grid.grabExpr(draw(fig2a, padding = unit(c(.2, .2, .2, .2), "mm")))
+top = grid.grabExpr(draw(fig2a, padding = unit(c(0, 0, 0, .2), "mm")))
 
 bot <- plot_grid(fig2b, fig2c, fig2d, nrow=1, ncol=3,
           labels = c("B","C","D"), label_size = 22, scale = .95)
@@ -831,7 +844,7 @@ pg <- plot_grid(top, bot, nrow=2, ncol=1,
                 labels = c("A",""), label_size = 22)
 pg    
 ggsave(file.path(output_dir, "/figures/fig2.pdf"), pg,
-       width=12, height=8)      
+       width=13.1, height=8)      
           
 
 supp <- plot_grid(suppfig1a, suppfig1b, suppfig1c, nrow=3, ncol=1, scale = .95)
